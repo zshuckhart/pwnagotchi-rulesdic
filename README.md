@@ -1,12 +1,12 @@
 # pwnagotchi-rulesdic
 Plugins for pwnagotchi to run aircrack-ng on wordlist based on the ESSID.
-For educational purpose only, run it on your OWNN WIFI. 
+For educational purpose only, run it on your OWN WIFI. 
 
 # Install
 Aircrack-ng needed, to install:
-> apt-get install aircrack-ng
-> copy rulesdic.py into your custom plugin directory
-> Cracked handshakes stored in handshake folder as [essid].pcap.cracked
+- apt-get install aircrack-ng
+- copy rulesdic.py into your custom plugin directory
+- Cracked handshakes stored in handshake folder as [essid].pcap.cracked
 
 Cracked password are also available by click on rulesdic, in the plugin page
 
@@ -22,8 +22,8 @@ Password wordlist generated:
 - Leet: some basic transformations to leet, is len(essid) <= max_essid_len
 
 Based on:
-> https://github.com/SilenTree12th/pwnagotchi_plugins/blob/main/better_quickdic.py (main logic)
-> https://github.com/xfox64x/pwnagotchi_plugins/blob/master/quick_rides_to_jail/quick_rides_to_jail.py (regexp :-) )
-> wpa-sec-list (webhook)
+- https://github.com/SilenTree12th/pwnagotchi_plugins/blob/main/better_quickdic.py (main logic)
+- https://github.com/xfox64x/pwnagotchi_plugins/blob/master/quick_rides_to_jail/quick_rides_to_jail.py (regexp :-) )
+- wpa-sec-list (webhook)
 
 Have fun !
