@@ -164,8 +164,8 @@ class RulesDic(plugins.Plugin):
         self.options['handshakes'] = config['bettercap']['handshakes']
         if 'tmp_folder' not in self.options:
             self.options['tmp_folder'] = '/tmp'
-        if 'max_size' not in self.options:
-            self.options['max_size'] = 10
+        if 'max_essid_len' not in self.options:
+            self.options['max_essid_len'] = 12
         if 'face' not in self.options:
             self.options['face'] = '(≡·≡)'
 
@@ -235,7 +235,9 @@ class RulesDic(plugins.Plugin):
         wordlist.extend(self._reverse_rule(essid_bases))
         wordlist.extend(self._punctuation_rule(essid_bases))
         wordlist.extend(self._years_rule(essid_bases))
-        wordlist.extend(self._leet_rule(essid))
+        if len(essid) <= self.options['max_essid_len']:
+            logging.info(f'[RulesDic] Generating leet wordlist')
+            wordlist.extend(self._leet_rule(essid))
         wordlist = list(dict.fromkeys(wordlist))
         with open(wordlist_filename, "w") as f:
             f.write('\n'.join(wordlist))
