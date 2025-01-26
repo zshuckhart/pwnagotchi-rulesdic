@@ -226,17 +226,15 @@ class RulesDic(plugins.Plugin):
 
     def check_handcheck(self, filename):
         aircrack_execution = subprocess.run(
-            (f'/usr/bin/aircrack-ng {filename}'),
+            (f'nice /usr/bin/aircrack-ng {filename}'),
             shell=True, stdout=subprocess.PIPE)
         result = aircrack_execution.stdout.decode('utf-8').strip()
         return crackable_handshake_re.search(result)
 
     def try_to_crack(self, filename, essid, bssid):
-        def setlimits():
-            resource.setrlimit(resource.RLIMIT_CPU, (1, 1))
         wordlist_filename = self._generate_dictionnary(filename, essid)
         aircrack_execution = subprocess.run((
-            f'/usr/bin/aircrack-ng {filename} -w {wordlist_filename} -l {filename}.cracked -q -b {bssid} | grep KEY'),
+            f'nice /usr/bin/aircrack-ng {filename} -w {wordlist_filename} -l {filename}.cracked -q -b {bssid} | grep KEY'),
             shell=True, stdout=subprocess.PIPE)
         result = aircrack_execution.stdout.decode("utf-8").strip()
         if result != "KEY NOT FOUND":
