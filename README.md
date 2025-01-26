@@ -1,5 +1,5 @@
 # pwnagotchi-rulesdic
-Plugins for pwnagotchi to run aircrack-ng on wordlist based on the ESSID.
+Plugins for pwnagotchi to run aircrack-ng on wordlist based on the ESSID. The main goal is to target weak wifi, like IoT or devices with default passwords.
 For educational purpose only, run it on your OWN WIFI. 
 
 # Install
@@ -14,6 +14,10 @@ Cracked password are also available by click on rulesdic, in the plugin page
 main.plugins.rulesdic.enabled = true
 main.plugins.rulesdic.tmp_folder = '/my/tmp/folder' # optional, default: /tmp
 main.plugins.rulesdic.max_essid_len = 12 # optional, if set to -1-> no limit else does not general leet rule if len(essid) > max_essid_len
+main.plugins.rulesdic.exclude = [  #REGEXP to match the WIFI name
+	"^Android",
+	"^[Ii][Pp]hone"
+]
 main.plugins.rulesdic.face = '(≡·≡)'
 
 Password wordlist generated:
