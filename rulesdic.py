@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import subprocess
+import resource
 import pathlib
 from itertools import product
 from datetime import datetime
@@ -124,7 +125,7 @@ TEMPLATE = """
 
 class RulesDic(plugins.Plugin):
     __author__ = 'fmatray'
-    __version__ = '1.0.0'
+    __version__ = '1.0.1'
     __license__ = 'GPL3'
     __description__ = 'Tries to crack with aircrack-ng with a generated wordlist base on the wifi name'
     __dependencies__ = {
@@ -162,6 +163,8 @@ class RulesDic(plugins.Plugin):
 
     def on_config_changed(self, config):
         self.options['handshakes'] = config['bettercap']['handshakes']
+        if 'exclude' not in self.options:
+            self.options['exclude'] = []
         if 'tmp_folder' not in self.options:
             self.options['tmp_folder'] = '/tmp'
         if 'max_essid_len' not in self.options:
@@ -172,18 +175,30 @@ class RulesDic(plugins.Plugin):
     def on_handshake(self, agent, filename, access_point, client_station):
         if not self.running:
             return
+
         reported = self.report.data_field_or('reported', default=[])
+        excluded = self.report.data_field_or('excluded', default=[])
+        essid = os.path.splitext(os.path.basename(filename))[0].split("_")[0]
         if filename in reported:
             logging.info(f'[RulesDic] {filename} already processed')
             return
-
+        if self.options['exclude']:
+            if filename in excluded:
+                logging.info(f'[RulesDic] {filename} already excluded')
+                return
+            for pattern in self.options['exclude']:
+                if re.match(pattern, essid):
+                    excluded.append(filename)
+                    self.report.update(data={'reported': reported, 'excluded': excluded})
+                    logging.info(f'[RulesDic] {filename} excluded')
+                    return
         display = agent.view()
         display.set('face', self.options['face'])
         display.set('status', 'Captured new handshake')
         logging.info(
             f'[RulesDic] New Handshake {filename}')
         current_time = datetime.now()
-        essid = os.path.splitext(os.path.basename(filename))[0].split("_")[0]
+
         result = self.check_handcheck(filename)
         if not result:
             logging.info('[RulesDic] No handshake')
@@ -198,15 +213,16 @@ class RulesDic(plugins.Plugin):
         duration = (datetime.now() - current_time).total_seconds()
         if not pwd:
             display.set('face', self.options['face'])
-            display.set('status', r'No key found for {bssid} :\'()')
+            display.set('status', r'Password not found for {essid} :\'()')
             logging.warning(
-                f'!!! [RulesDic] !!! Key not found for {bssid} in {duration // 60:.0f}min and {duration % 60:.0f}s')
+                f'!!! [RulesDic] !!! Key not found for {essid} in {duration // 60:.0f}min and {duration % 60:.0f}s')
         else:
             display.set('face', self.options['face'])
-            display.set('status', r'New key found for {bssid} :\'()')
+            display.set('status', r'Password cracked for {essid} :\'()')
             logging.warning(
-                f'!!! [RulesDic] !!! Cracked password for {bssid}: {pwd}. Found in {duration // 60:.0f}min and {duration % 60:.0f}s')
-        self.report.update(data={'reported': filename})
+                f'!!! [RulesDic] !!! Cracked password for {essid}: {pwd}. Found in {duration // 60:.0f}min and {duration % 60:.0f}s')
+        reported.append(filename)
+        self.report.update(data={'reported': reported, 'excluded': excluded})
 
     def check_handcheck(self, filename):
         aircrack_execution = subprocess.run(
@@ -216,6 +232,8 @@ class RulesDic(plugins.Plugin):
         return crackable_handshake_re.search(result)
 
     def try_to_crack(self, filename, essid, bssid):
+        def setlimits():
+            resource.setrlimit(resource.RLIMIT_CPU, (1, 1))
         wordlist_filename = self._generate_dictionnary(filename, essid)
         aircrack_execution = subprocess.run((
             f'/usr/bin/aircrack-ng {filename} -w {wordlist_filename} -l {filename}.cracked -q -b {bssid} | grep KEY'),
@@ -235,7 +253,8 @@ class RulesDic(plugins.Plugin):
         wordlist.extend(self._reverse_rule(essid_bases))
         wordlist.extend(self._punctuation_rule(essid_bases))
         wordlist.extend(self._years_rule(essid_bases))
-        if len(essid) <= self.options['max_essid_len']:
+        if self.options['max_essid_len'] == -1 or len(essid) <= self.options[
+            'max_essid_len']:
             logging.info(f'[RulesDic] Generating leet wordlist')
             wordlist.extend(self._leet_rule(essid))
         wordlist = list(dict.fromkeys(wordlist))
