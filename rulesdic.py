@@ -12,7 +12,7 @@ import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
 
-crackable_handshake_re = re.compile(
+crackable__re = re.compile(
     r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+((\([1-9][0-9]* handshake(, with PMKID)?\))|(\(\d+ handshake, with PMKID\)))'
 )
 
@@ -189,7 +189,7 @@ class RulesDic(plugins.Plugin):
         display = agent.view()
         display.set('face', self.options['face'])
         display.set('status', 'Captured new handshake')
-        logging.info(f'[RulesDic] New Handshake {filename}')
+        logging.info(f'[RulesDic] New handshake {filename}')
         current_time = datetime.now()
 
         result = self.check_handshake(filename)
@@ -201,8 +201,8 @@ class RulesDic(plugins.Plugin):
 
         bssid = result.group('bssid')
         display.set('face', self.options['face'])
-        display.set('status', 'Handshake found')
-        logging.info('[RulesDic] Handshake confirmed')
+        display.set('status', 'handshake found')
+        logging.info('[RulesDic] handshake confirmed')
         pwd = self.try_to_crack(filename, essid, bssid)
         duration = (datetime.now() - current_time).total_seconds()
 
@@ -220,31 +220,31 @@ class RulesDic(plugins.Plugin):
         reported.append(filename)
         self.report.update(data={'reported': reported, 'excluded': excluded})
 
-def check_handcheck(self, filename, interface='wlan0monitor'):
-    # Run hcxdumptool for a longer duration and with additional options
-    command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
-    hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    result = hcxdumptool_execution.stdout.decode('utf-8').strip()
-
-    if hcxdumptool_execution.stderr:
-        logging.warning(f'[RulesDic] hcxdumptool stderr: {hcxdumptool_execution.stderr.decode("utf-8").strip()}')
-
-    for _ in range(3):
-        if result:
-            break
-        logging.info('[RulesDic] Retry capturing handshake...')
+    def check_handshake(self, filename, interface='wlan0'):
+        # Run hcxdumptool for a longer duration and with additional options
+        command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
         hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         result = hcxdumptool_execution.stdout.decode('utf-8').strip()
 
-    enhanced_handshake_re = re.compile(
-        r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+(?:\([1-9][0-9]* handshake(?:, with PMKID)?\)|\(\d+ handshake(?:, with PMKID)?\)|handshake|PMKID)')
-    handshake_match = enhanced_handshake_re.search(result)
+        if hcxdumptool_execution.stderr:
+            logging.warning(f'[RulesDic] hcxdumptool stderr: {hcxdumptool_execution.stderr.decode("utf-8").strip()}')
 
-    if not handshake_match:
-        logging.warning('[RulesDic] No handshake found with initial pattern, trying alternative pattern...')
+        for _ in range(3):
+            if result:
+                break
+            logging.info('[RulesDic] Retry capturing ...')
+            hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result = hcxdumptool_execution.stdout.decode('utf-8').strip()
 
-    return handshake_match
-    
+        enhanced__re = re.compile(
+            r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+(?:\([1-9][0-9]* (?:, with PMKID)?\)|\(\d+ (?:, with PMKID)?\)||PMKID)')
+        _match = enhanced__re.search(result)
+
+        if not _match:
+            logging.warning('[RulesDic] No  found with initial pattern, trying alternative pattern...')
+
+        return _match
+
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionnary(filename, essid)
         command = f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'
@@ -309,7 +309,7 @@ def check_handcheck(self, filename, interface='wlan0monitor'):
         if path == "/" or not path:
             try:
                 passwords = []
-                cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
+                cracked_files = pathlib.Path('/home/pi/s/').glob('*.cracked')
                 for cracked_file in cracked_files:
                     ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
                     with open(cracked_file, 'r') as f:
