@@ -115,38 +115,38 @@ class RulesDic(plugins.Plugin):
         self.report.update(data={'reported': reported, 'excluded': excluded})
 
     def check_handcheck(self, filename):
-    # Run hcxdumptool for a longer duration and with additional options
-    hcxdumptool_execution = subprocess.run(
-        (f'nice /usr/bin/hcxdumptool -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication=1'),
-        shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    
-    result = hcxdumptool_execution.stdout.decode('utf-8').strip()
-    
-    # Log the stderr output for debugging purposes
-    error_output = hcxdumptool_execution.stderr.decode('utf-8').strip()
-    if error_output:
-        logging.warning(f'[RulesDic] hcxdumptool stderr: {error_output}')
-    
-    # Retry mechanism in case of failure
-    retries = 3
-    while not result and retries > 0:
-        logging.info('[RulesDic] Retry capturing handshake...')
+        # Run hcxdumptool for a longer duration and with additional options
         hcxdumptool_execution = subprocess.run(
             (f'nice /usr/bin/hcxdumptool -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication=1'),
             shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
         result = hcxdumptool_execution.stdout.decode('utf-8').strip()
-        retries -= 1
-    
-    # Use the enhanced regex pattern
-    enhanced_handshake_re = re.compile(
-        r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+(?:\([1-9][0-9]* handshake(?:, with PMKID)?\)|\(\d+ handshake(?:, with PMKID)?\)|handshake|PMKID)')
-    
-    handshake_match = enhanced_handshake_re.search(result)
-    if not handshake_match:
-        logging.warning('[RulesDic] No handshake found with initial pattern, trying alternative pattern...')
-        # You can add more alternative patterns here if needed
-    
-    return handshake_match
+        
+        # Log the stderr output for debugging purposes
+        error_output = hcxdumptool_execution.stderr.decode('utf-8').strip()
+        if error_output:
+            logging.warning(f'[RulesDic] hcxdumptool stderr: {error_output}')
+        
+        # Retry mechanism in case of failure
+        retries = 3
+        while not result and retries > 0:
+            logging.info('[RulesDic] Retry capturing handshake...')
+            hcxdumptool_execution = subprocess.run(
+                (f'nice /usr/bin/hcxdumptool -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication=1'),
+                shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result = hcxdumptool_execution.stdout.decode('utf-8').strip()
+            retries -= 1
+        
+        # Use the enhanced regex pattern
+        enhanced_handshake_re = re.compile(
+            r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+(?:\([1-9][0-9]* handshake(?:, with PMKID)?\)|\(\d+ handshake(?:, with PMKID)?\)|handshake|PMKID)')
+        
+        handshake_match = enhanced_handshake_re.search(result)
+        if not handshake_match:
+            logging.warning('[RulesDic] No handshake found with initial pattern, trying alternative pattern...')
+            # You can add more alternative patterns here if needed
+        
+        return handshake_match
 
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionnary(filename, essid)
@@ -167,8 +167,7 @@ class RulesDic(plugins.Plugin):
         wordlist.extend(self._reverse_rule(essid_bases))
         wordlist.extend(self._punctuation_rule(essid_bases))
         wordlist.extend(self._years_rule(essid_bases))
-        if self.options['max_essid_len'] == -1 or len(essid) <= self.options[
-            'max_essid_len']:
+        if self.options['max_essid_len'] == -1 or len(essid) <= self.options['max_essid_len']:
             logging.info(f'[RulesDic] Generating leet wordlist')
             wordlist.extend(self._leet_rule(essid))
         wordlist = list(dict.fromkeys(wordlist))
@@ -187,19 +186,15 @@ class RulesDic(plugins.Plugin):
 
     def _punctuation_rule(self, base_essids):
         wd = ["".join(p) for p in product(base_essids, punctuation)]
-        wd.extend(["".join(p) for p in
-                   product(base_essids, punctuation, punctuation)])
+        wd.extend(["".join(p) for p in product(base_essids, punctuation, punctuation)])
         wd.extend(["".join(p) for p in product(punctuation, base_essids)])
-        wd.extend(["".join(p) for p in
-                   product(punctuation, base_essids, punctuation)])
+        wd.extend(["".join(p) for p in product(punctuation, base_essids, punctuation)])
         return wd
 
     def _years_rule(self, base_essids):
         wd = ["".join(p) for p in product(base_essids, self.years)]
-        wd.extend(
-            ["".join(p) for p in product(base_essids, self.years, punctuation)])
-        wd.extend(
-            ["".join(p) for p in product(base_essids, punctuation, self.years)])
+        wd.extend(["".join(p) for p in product(base_essids, self.years, punctuation)])
+        wd.extend(["".join(p) for p in product(base_essids, punctuation, self.years)])
         return wd
 
     def _leet_rule(self, essid):
