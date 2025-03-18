@@ -3,8 +3,8 @@ Plugins for pwnagotchi to run aircrack-ng on wordlist based on the ESSID. The ma
 For educational purpose only, run it on your OWN WIFI. 
 
 # Install
-Aircrack-ng needed, to install:
-- apt-get install aircrack-ng
+Plugin will attempt to install Hashcat and hcxtpools but it's better to install beforehand:
+- apt-get install hashcat hcxtools
 - copy rulesdic.py into your custom plugin directory
 - Cracked handshakes stored in handshake folder as [essid].pcap.cracked
 
@@ -21,14 +21,24 @@ main.plugins.rulesdic.exclude = [  #REGEXP to match the WIFI name
 ]
 main.plugins.rulesdic.face = '(≡·≡)'
 ```
+or in new tomlkit format if using
+...
+[main.plugins.rulesdic]
+enabled = true
+tmp_folder = '/my/tmp/folder' # optional if not included will default to: /tmp
+max_essid_len = 12 # optional, if set to -1-> no limit else does not general leet rule if len(essid) > max_essid_len
+exclude = ["^Android", "^[Ii][Pp]hone"] #REGEXP to match the WIFI name
+face = '(≡·≡)'
+...
+
 Password wordlist generated:
 - Basic: Upper, lower, capitalized, reversed
 - Punctuation and years: Adding 1 or 2 puntuation and/or years (1900 until today) in several orders
 - Leet: some basic transformations to leet, is len(essid) <= max_essid_len
 
 # TODO
-- [ ] Try with hashcat as it seams more efficient, instead of aircrack-ng.
-- [ ] Limit aircrack-ng or hashcat duration as we don't want to make them run for hours but perhaps 5-10 min max.
+- [X] Try with hashcat as it seams more efficient, instead of aircrack-ng.
+- [ ] Limit hashcat duration as we don't want to make them run for hours but perhaps 5-10 min max.
 - [ ] Improve exclude and add include options to select which wifi to target, perhaps with vendors :-).
 - [ ] Add some cool messages and faces on display. It's a bit boring right now.
 - [ ] Hack the World!
