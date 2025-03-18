@@ -14,7 +14,8 @@ from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
 
 crackable_handshake_re = re.compile(
-    r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+((\([1-9][0-9]* handshake(, with PMKID)?\))|(\(\d+ handshake, with PMKID\)))')
+    r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+((\([1-9][0-9]* handshake(, with PMKID)?\))|(\(\d+ handshake, with PMKID\)))'
+)
 
 TEMPLATE = """
 {% extends "base.html" %}
@@ -133,12 +134,10 @@ class RulesDic(plugins.Plugin):
 
     def __init__(self):
         try:
-            self.report = StatusFile('/root/handshakes/.rulesdic',
-                                     data_format='json')
+            self.report = StatusFile('/root/handshakes/.rulesdic', data_format='json')
         except JSONDecodeError:
             os.remove('/root/handshakes/.rulesdic')
-            self.report = StatusFile('/root/handshakes/.rulesdic',
-                                     data_format='json')
+            self.report = StatusFile('/root/handshakes/.rulesdic', data_format='json')
 
         self.options = dict()
         self.years = list(map(str, range(1900, datetime.now().year + 1)))
@@ -194,8 +193,7 @@ class RulesDic(plugins.Plugin):
         display = agent.view()
         display.set('face', self.options['face'])
         display.set('status', 'Captured new handshake')
-        logging.info(
-            f'[RulesDic] New Handshake {filename}')
+        logging.info(f'[RulesDic] New Handshake {filename}')
         current_time = datetime.now()
 
         result = self.check_handcheck(filename)
@@ -241,7 +239,7 @@ class RulesDic(plugins.Plugin):
         while not result and retries > 0:
             logging.info('[RulesDic] Retry capturing handshake...')
             hcxdumptool_execution = subprocess.run(
-                (f'nice /usr/bin/hcxdumptool -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication=1'),
+                (f'nice /usr/bin/hcxdumptool -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'),
                 shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             result = hcxdumptool_execution.stdout.decode('utf-8').strip()
             retries -= 1
@@ -355,20 +353,16 @@ class RulesDic(plugins.Plugin):
         if path == "/" or not path:
             try:
                 passwords = []
-                cracked_files = pathlib.Path('/home/pi/handshakes/').glob(
-                    '*.cracked')
+                cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
                 for cracked_file in cracked_files:
-                    ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.",
-                                             cracked_file.name)[0]
+                    ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
                     with open(cracked_file, 'r') as f:
                         pwd = f.read()
                     passwords.append({
                         "ssid": ssid,
                         "bssid": bssid,
                         "password": pwd})
-                return render_template_string(TEMPLATE,
-                                              title="Passwords list",
-                                              passwords=passwords)
+                return render_template_string(TEMPLATE, title="Passwords list", passwords=passwords)
             except Exception as e:
                 logging.error(f"[RulesDic] error while loading passwords: {e}")
                 logging.debug(e, exc_info=True)
