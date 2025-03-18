@@ -2,12 +2,11 @@ import logging
 import os
 import re
 import subprocess
-import resource
 import pathlib
 from itertools import product
 from datetime import datetime
 from string import punctuation
-from flask import abort, send_from_directory, render_template_string
+from flask import render_template_string
 
 import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
@@ -133,25 +132,33 @@ class RulesDic(plugins.Plugin):
     }
 
     def __init__(self):
-        try:
-            self.report = StatusFile('/root/handshakes/.rulesdic', data_format='json')
-        except JSONDecodeError:
-            os.remove('/root/handshakes/.rulesdic')
-            self.report = StatusFile('/root/handshakes/.rulesdic', data_format='json')
-
-        self.options = dict()
-        self.years = list(map(str, range(1900, datetime.now().year + 1)))
-        self.years.extend(map(str, range(0, 100)))
+        self.report = self._load_status_file()
+        self.options = self._initialize_options()
+        self.years = self._initialize_years()
         self.running = False
         self.counter = 0
 
-    # called when the plugin is loaded
+    def _load_status_file(self):
+        try:
+            return StatusFile('/root/handshakes/.rulesdic', data_format='json')
+        except JSONDecodeError:
+            os.remove('/root/handshakes/.rulesdic')
+            return StatusFile('/root/handshakes/.rulesdic', data_format='json')
+
+    def _initialize_options(self):
+        return {'exclude': [], 'tmp_folder': '/tmp', 'max_essid_len': 12, 'face': '(≡·≡)'}
+
+    def _initialize_years(self):
+        years = list(map(str, range(1900, datetime.now().year + 1)))
+        years.extend(map(str, range(0, 100)))
+        return years
+
     def on_loaded(self):
         logging.info('[RulesDic] plugin loaded')
-
-        check = subprocess.run((
-            '/usr/bin/dpkg -l hashcat | grep hashcat | awk \'{print $2, $3}\''),
-            shell=True, stdout=subprocess.PIPE)
+        check = subprocess.run(
+            '/usr/bin/dpkg -l hashcat | grep hashcat | awk \'{print $2, $3}\'',
+            shell=True, stdout=subprocess.PIPE
+        )
         check = check.stdout.decode('utf-8').strip()
         if check != "hashcat <none>":
             logging.info('[RulesDic] Found %s' % check)
@@ -161,14 +168,6 @@ class RulesDic(plugins.Plugin):
 
     def on_config_changed(self, config):
         self.options['handshakes'] = config['bettercap']['handshakes']
-        if 'exclude' not in self.options:
-            self.options['exclude'] = []
-        if 'tmp_folder' not in self.options:
-            self.options['tmp_folder'] = '/tmp'
-        if 'max_essid_len' not in self.options:
-            self.options['max_essid_len'] = 12
-        if 'face' not in self.options:
-            self.options['face'] = '(≡·≡)'
 
     def on_handshake(self, agent, filename, access_point, client_station):
         if not self.running:
@@ -180,34 +179,33 @@ class RulesDic(plugins.Plugin):
         if filename in reported:
             logging.info(f'[RulesDic] {filename} already processed')
             return
-        if self.options['exclude']:
-            if filename in excluded:
-                logging.info(f'[RulesDic] {filename} already excluded')
-                return
-            for pattern in self.options['exclude']:
-                if re.match(pattern, essid):
-                    excluded.append(filename)
-                    self.report.update(data={'reported': reported, 'excluded': excluded})
-                    logging.info(f'[RulesDic] {filename} excluded')
-                    return
+
+        if filename in excluded or any(re.match(pattern, essid) for pattern in self.options['exclude']):
+            excluded.append(filename)
+            self.report.update(data={'reported': reported, 'excluded': excluded})
+            logging.info(f'[RulesDic] {filename} excluded')
+            return
+
         display = agent.view()
         display.set('face', self.options['face'])
         display.set('status', 'Captured new handshake')
         logging.info(f'[RulesDic] New Handshake {filename}')
         current_time = datetime.now()
 
-        result = self.check_handcheck(filename)
+        result = self.check_handshake(filename)
         if not result:
             logging.info('[RulesDic] No handshake')
             display.set('face', self.options['face'])
             display.set('status', 'No handshake found, next time perhaps...')
             return
+
         bssid = result.group('bssid')
         display.set('face', self.options['face'])
         display.set('status', 'Handshake found')
         logging.info('[RulesDic] Handshake confirmed')
         pwd = self.try_to_crack(filename, essid, bssid)
         duration = (datetime.now() - current_time).total_seconds()
+
         if not pwd:
             display.set('face', self.options['face'])
             display.set('status', r'Password not found for {essid} :\'()')
@@ -218,65 +216,54 @@ class RulesDic(plugins.Plugin):
             display.set('status', r'Password cracked for {essid} :\'()')
             logging.warning(
                 f'!!! [RulesDic] !!! Cracked password for {essid}: {pwd}. Found in {duration // 60:.0f}min and {duration % 60:.0f}s')
+
         reported.append(filename)
         self.report.update(data={'reported': reported, 'excluded': excluded})
 
-    def check_handcheck(self, filename):
-        # Run hcxdumptool for a longer duration and with additional options
-        hcxdumptool_execution = subprocess.run(
-            (f'nice /usr/bin/hcxdumptool -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'),
-            shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        
+    def check_handshake(self, filename):
+        command = f'nice /usr/bin/hcxdumptool -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
+        hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         result = hcxdumptool_execution.stdout.decode('utf-8').strip()
-        
-        # Log the stderr output for debugging purposes
-        error_output = hcxdumptool_execution.stderr.decode('utf-8').strip()
-        if error_output:
-            logging.warning(f'[RulesDic] hcxdumptool stderr: {error_output}')
-        
-        # Retry mechanism in case of failure
-        retries = 3
-        while not result and retries > 0:
+
+        if hcxdumptool_execution.stderr:
+            logging.warning(f'[RulesDic] hcxdumptool stderr: {hcxdumptool_execution.stderr.decode("utf-8").strip()}')
+
+        for _ in range(3):
+            if result:
+                break
             logging.info('[RulesDic] Retry capturing handshake...')
-            hcxdumptool_execution = subprocess.run(
-                (f'nice /usr/bin/hcxdumptool -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'),
-                shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             result = hcxdumptool_execution.stdout.decode('utf-8').strip()
-            retries -= 1
-        
-        # Use the enhanced regex pattern
+
         enhanced_handshake_re = re.compile(
             r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+(?:\([1-9][0-9]* handshake(?:, with PMKID)?\)|\(\d+ handshake(?:, with PMKID)?\)|handshake|PMKID)')
-        
         handshake_match = enhanced_handshake_re.search(result)
+
         if not handshake_match:
             logging.warning('[RulesDic] No handshake found with initial pattern, trying alternative pattern...')
-            # You can add more alternative patterns here if needed
-        
+
         return handshake_match
 
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionnary(filename, essid)
-        hashcat_execution = subprocess.run((
-            f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'),
-            shell=True, stdout=subprocess.PIPE)
+        command = f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'
+        subprocess.run(command, shell=True, stdout=subprocess.PIPE)
         result = pathlib.Path(f"{filename}.cracked").read_text().strip()
+
         if result:
             return result.split(':')[1]
         return None
 
     def _generate_dictionnary(self, filename, essid):
-        wordlist_filename = os.path.splitext(os.path.basename(filename))[0] + ".txt"
-        wordlist_filename = os.path.join(self.options['tmp_folder'], wordlist_filename)
+        wordlist_filename = os.path.join(self.options['tmp_folder'], f"{os.path.splitext(os.path.basename(filename))[0]}.txt")
         logging.info(f'[RulesDic] Generating {wordlist_filename}')
         essid_bases = self._essid_base(essid)
-        wordlist = essid_bases.copy()
-        wordlist.extend(self._reverse_rule(essid_bases))
-        wordlist.extend(self._punctuation_rule(essid_bases))
-        wordlist.extend(self._years_rule(essid_bases))
+        wordlist = essid_bases + self._reverse_rule(essid_bases) + self._punctuation_rule(essid_bases) + self._years_rule(essid_bases)
+
         if self.options['max_essid_len'] == -1 or len(essid) <= self.options['max_essid_len']:
             logging.info(f'[RulesDic] Generating leet wordlist')
-            wordlist.extend(self._leet_rule(essid))
+            wordlist += self._leet_rule(essid)
+
         wordlist = list(dict.fromkeys(wordlist))
         with open(wordlist_filename, "w") as f:
             f.write('\n'.join(wordlist))
@@ -284,65 +271,33 @@ class RulesDic(plugins.Plugin):
         return wordlist_filename
 
     def _essid_base(self, essid):
-        return [essid,
-                essid.upper(), essid.lower(), essid.capitalize(),
-                re.sub('[0-9]*$', "", essid)]
+        return [essid, essid.upper(), essid.lower(), essid.capitalize(), re.sub('[0-9]*$', "", essid)]
 
     def _reverse_rule(self, base_essids):
         return [essid[::-1] for essid in base_essids]
 
     def _punctuation_rule(self, base_essids):
         wd = ["".join(p) for p in product(base_essids, punctuation)]
-        wd.extend(["".join(p) for p in product(base_essids, punctuation, punctuation)])
-        wd.extend(["".join(p) for p in product(punctuation, base_essids)])
-        wd.extend(["".join(p) for p in product(punctuation, base_essids, punctuation)])
+        wd += ["".join(p) for p in product(base_essids, punctuation, punctuation)]
+        wd += ["".join(p) for p in product(punctuation, base_essids)]
+        wd += ["".join(p) for p in product(punctuation, base_essids, punctuation)]
         return wd
 
     def _years_rule(self, base_essids):
         wd = ["".join(p) for p in product(base_essids, self.years)]
-        wd.extend(["".join(p) for p in product(base_essids, self.years, punctuation)])
-        wd.extend(["".join(p) for p in product(base_essids, punctuation, self.years)])
+        wd += ["".join(p) for p in product(base_essids, self.years, punctuation)]
+        wd += ["".join(p) for p in product(base_essids, punctuation, self.years)]
         return wd
 
     def _leet_rule(self, essid):
-        # simple leet dictionnary with only simple caracters substitutions
         leet_dict = {
-            'a': ['4', '@', 'a', 'A'],
-            'b': ['8', '6', 'b', 'B'],
-            'c': ['(', '<', '{', '[', 'c', 'C'],
-            'd': ['d', 'D'],
-            'e': ['3', 'e', 'E'],
-            'f': ['f', 'F'],
-            'g': ['6', '9', 'g', 'G'],
-            'h': ['#', 'h', 'H'],
-            'i': ['!', '|', '1', 'i', 'I'],
-            'j': ['j', 'J'],
-            'k': ['k', 'K'],
-            'l': ['1', 'l', 'L'],
-            'm': ['m', 'M'],
-            'n': ['n', 'N'],
-            'o': ['0', 'o', 'O'],
-            'p': ['p', 'P'],
-            'q': ['q', 'Q'],
-            'r': ['r', 'R'],
-            's': ['5', '$', 's', 'S'],
-            't': ['7', '+', 't', 'T'],
-            'u': ['u', 'U'],
-            'v': ['v', 'V'],
-            'w': ['w', 'W'],
-            'x': ['x', 'X'],
-            'y': ['y', 'Y'],
-            'z': ['2', 'z', 'Z'],
-            '0': ['o', 'O', '0'],
-            '1': ['i', 'I', '1'],
-            '2': ['r', 'R', '2'],
-            '3': ['e', 'E', '3'],
-            '4': ['a', 'A', '4'],
-            '5': ['s', 'S', '5'],
-            '6': ['b', 'B', '6'],
-            '7': ['y', 'Y', '7'],
-            '8': ['b', 'B', '8'],
-            '9': ['g', 'G', '9'],
+            'a': ['4', '@', 'a', 'A'], 'b': ['8', '6', 'b', 'B'], 'c': ['(', '<', '{', '[', 'c', 'C'], 'd': ['d', 'D'],
+            'e': ['3', 'e', 'E'], 'f': ['f', 'F'], 'g': ['6', '9', 'g', 'G'], 'h': ['#', 'h', 'H'], 'i': ['!', '|', '1', 'i', 'I'],
+            'j': ['j', 'J'], 'k': ['k', 'K'], 'l': ['1', 'l', 'L'], 'm': ['m', 'M'], 'n': ['n', 'N'], 'o': ['0', 'o', 'O'],
+            'p': ['p', 'P'], 'q': ['q', 'Q'], 'r': ['r', 'R'], 's': ['5', '$', 's', 'S'], 't': ['7', '+', 't', 'T'], 'u': ['u', 'U'],
+            'v': ['v', 'V'], 'w': ['w', 'W'], 'x': ['x', 'X'], 'y': ['y', 'Y'], 'z': ['2', 'z', 'Z'], '0': ['o', 'O', '0'],
+            '1': ['i', 'I', '1'], '2': ['r', 'R', '2'], '3': ['e', 'E', '3'], '4': ['a', 'A', '4'], '5': ['s', 'S', '5'],
+            '6': ['b', 'B', '6'], '7': ['y', 'Y', '7'], '8': ['b', 'B', '8'], '9': ['g', 'G', '9']
         }
         transformations = [leet_dict.get(c, c) for c in essid.lower()]
         return [''.join(p) for p in product(*transformations)]
@@ -358,10 +313,7 @@ class RulesDic(plugins.Plugin):
                     ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
                     with open(cracked_file, 'r') as f:
                         pwd = f.read()
-                    passwords.append({
-                        "ssid": ssid,
-                        "bssid": bssid,
-                        "password": pwd})
+                    passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd})
                 return render_template_string(TEMPLATE, title="Passwords list", passwords=passwords)
             except Exception as e:
                 logging.error(f"[RulesDic] error while loading passwords: {e}")
