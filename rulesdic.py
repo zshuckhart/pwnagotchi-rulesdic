@@ -1,11 +1,3 @@
-# Changes made from 1.02 (https://github.com/fmatray/pwnagotchi-rulesdic):
-# Updated the class description to reflect the use of hashcat.
-# Updated the __dependencies__ to include hashcat and hcxtools.
-# Modified the on_loaded method to check for hashcat and hcxtools, and install hcxtools if not present.
-# Modified the check_handshake method to use hcxdumptool to convert the handshake file to a format suitable for hashcat.
-# Modified the try_to_crack method to use hashcat for the cracking process.
-# This code ensures that hcxtools is installed if it's not already present and uses hashcat for the cracking process.
-# Public code used from: https://github.com/xfox64x/pwnagotchi_plugins, https://github.com/evilsocket/pwnagotchi, https://github.com/Fikolmij/Pwnagotchi-For-Banana-Orange-Pi, https://github.com/infinispan/infinispan, https://github.com/anitasari2311/project_cms, https://github.com/UpSphereSolutions/application 
 import logging
 import os
 import re
@@ -20,116 +12,6 @@ from flask import abort, send_from_directory, render_template_string
 import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
-
-crackable_handshake_re = re.compile(
-    r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+((\([1-9][0-9]* handshake(, with PMKID)?\))|(\(\d+ handshake, with PMKID\)))')
-
-TEMPLATE = """
-{% extends "base.html" %}
-{% set active_page = "passwordsList" %}
-{% block title %}
-    {{ title }}
-{% endblock %}
-{% block meta %}
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, user-scalable=0" />
-{% endblock %}
-{% block styles %}
-{{ super() }}
-    <style>
-        #searchText {
-            width: 100%;
-        }
-        table {
-            table-layout: auto;
-            width: 100%;
-        }
-        table, th, td {
-            border: 1px solid;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 15px;
-            text-align: left;
-        }
-        @media screen and (max-width:700px) {
-            table, tr, td {
-                padding:0;
-                border:1px solid;
-            }
-            table {
-                border:none;
-            }
-            tr:first-child, thead, th {
-                display:none;
-                border:none;
-            }
-            tr {
-                float: left;
-                width: 100%;
-                margin-bottom: 2em;
-            }
-            td {
-                float: left;
-                width: 100%;
-                padding:1em;
-            }
-            td::before {
-                content:attr(data-label);
-                word-wrap: break-word;
-                color: white;
-                border-right:2px solid;
-                width: 20%;
-                float:left;
-                padding:1em;
-                font-weight: bold;
-                margin:-1em 1em -1em -1em;
-            }
-        }
-    </style>
-{% endblock %}
-{% block script %}
-    var searchInput = document.getElementById("searchText");
-    searchInput.onkeyup = function() {
-        var filter, table, tr, td, i, txtValue;
-        filter = searchInput.value.toUpperCase();
-        table = document.getElementById("tableOptions");
-        if (table) {
-            tr = table.getElementsByTagName("tr");
-
-            for (i = 0; i < tr.length; i++) {
-                td = tr[i].getElementsByTagName("td")[0];
-                if (td) {
-                    txtValue = td.textContent || td.innerText;
-                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                        tr[i].style.display = "";
-                    }else{
-                        tr[i].style.display = "none";
-                    }
-                }
-            }
-        }
-    }
-{% endblock %}
-{% block content %}
-    <input type="text" id="searchText" placeholder="Search for ..." title="Type in a filter">
-    <table id="tableOptions">
-        <tr>
-            <th>SSID</th>
-            <th>BSSID</th>
-            <th>Password</th>
-        </tr>
-        {% for p in passwords %}
-            <tr>
-                <td data-label="SSID">{{p["ssid"]}}</td>
-                <td data-label="BSSID">{{p["bssid"]}}</td>
-                <td data-label="Password">{{p["password"]}}</td>
-            </tr>
-        {% endfor %}
-    </table>
-{% endblock %}
-"""
-
 
 class RulesDic(plugins.Plugin):
     __authors__ = 'fmatray, awwshucks'
@@ -151,7 +33,7 @@ class RulesDic(plugins.Plugin):
 
         self.options = dict()
         self.years = list(map(str, range(1900, datetime.now().year + 1)))
-        self.years.extend(map(str, range(00, 100)))
+        self.years.extend(map(str, range(0, 100)))
         self.running = False
         self.counter = 0
 
@@ -372,7 +254,7 @@ class RulesDic(plugins.Plugin):
                 cracked_files = pathlib.Path('/home/pi/handshakes/').glob(
                     '*.cracked')
                 for cracked_file in cracked_files:
-                    ssid, bssid = re.findall("(.*)_([0-9a-f]{12})\.",
+                    ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.",
                                              cracked_file.name)[0]
                     with open(cracked_file, 'r') as f:
                         pwd = f.read()
