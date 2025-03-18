@@ -1,4 +1,4 @@
-import logging
+wlpimport logging
 import os
 import re
 import subprocess
@@ -220,7 +220,7 @@ class RulesDic(plugins.Plugin):
         reported.append(filename)
         self.report.update(data={'reported': reported, 'excluded': excluded})
 
-    def check_handshake(self, filename, interface='wlan0'):
+    def check_handshake(self, filename, interface='wlan0mon'):
         # Run hcxdumptool for a longer duration and with additional options
         command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
         hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
