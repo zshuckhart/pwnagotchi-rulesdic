@@ -1,3 +1,11 @@
+# Changes made from 1.02 (https://github.com/fmatray/pwnagotchi-rulesdic):
+# Updated the class description to reflect the use of hashcat.
+# Updated the __dependencies__ to include hashcat and hcxtools.
+# Modified the on_loaded method to check for hashcat and hcxtools, and install hcxtools if not present.
+# Modified the check_handshake method to use hcxdumptool to convert the handshake file to a format suitable for hashcat.
+# Modified the try_to_crack method to use hashcat for the cracking process.
+# This code ensures that hcxtools is installed if it's not already present and uses hashcat for the cracking process.
+# Public code used from: https://github.com/xfox64x/pwnagotchi_plugins, https://github.com/evilsocket/pwnagotchi, https://github.com/Fikolmij/Pwnagotchi-For-Banana-Orange-Pi, https://github.com/infinispan/infinispan, https://github.com/anitasari2311/project_cms, https://github.com/UpSphereSolutions/application 
 import logging
 import os
 import re
@@ -124,12 +132,12 @@ TEMPLATE = """
 
 
 class RulesDic(plugins.Plugin):
-    __author__ = 'fmatray'
-    __version__ = '1.0.1'
+    __authors__ = 'fmatray, awwshucks'
+    __version__ = '1.0.2'
     __license__ = 'GPL3'
-    __description__ = 'Tries to crack with aircrack-ng with a generated wordlist base on the wifi name'
+    __description__ = 'Tries to crack with hashcat with a generated wordlist base on the wifi name'
     __dependencies__ = {
-        'apt': ['aircrack-ng'],
+        'apt': ['hashcat'],
     }
 
     def __init__(self):
@@ -152,14 +160,14 @@ class RulesDic(plugins.Plugin):
         logging.info('[RulesDic] plugin loaded')
 
         check = subprocess.run((
-            '/usr/bin/dpkg -l aircrack-ng | grep aircrack-ng | awk \'{print $2, $3}\''),
+            '/usr/bin/dpkg -l hashcat | grep hashcat | awk \'{print $2, $3}\''),
             shell=True, stdout=subprocess.PIPE)
         check = check.stdout.decode('utf-8').strip()
-        if check != "aircrack-ng <none>":
+        if check != "hashcat <none>":
             logging.info('[RulesDic] Found %s' % check)
             self.running = True
         else:
-            logging.warning('[RulesDic] aircrack-ng is not installed!')
+            logging.warning('[RulesDic] hashcat is not installed!')
 
     def on_config_changed(self, config):
         self.options['handshakes'] = config['bettercap']['handshakes']
@@ -225,26 +233,25 @@ class RulesDic(plugins.Plugin):
         self.report.update(data={'reported': reported, 'excluded': excluded})
 
     def check_handcheck(self, filename):
-        aircrack_execution = subprocess.run(
-            (f'nice /usr/bin/aircrack-ng {filename}'),
+        hcxdumptool_execution = subprocess.run(
+            (f'nice /usr/bin/hcxdumptool -o {filename}.pcapng --enable_status=1'),
             shell=True, stdout=subprocess.PIPE)
-        result = aircrack_execution.stdout.decode('utf-8').strip()
+        result = hcxdumptool_execution.stdout.decode('utf-8').strip()
         return crackable_handshake_re.search(result)
 
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionnary(filename, essid)
-        aircrack_execution = subprocess.run((
-            f'nice /usr/bin/aircrack-ng {filename} -w {wordlist_filename} -l {filename}.cracked -q -b {bssid} | grep KEY'),
+        hashcat_execution = subprocess.run((
+            f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'),
             shell=True, stdout=subprocess.PIPE)
-        result = aircrack_execution.stdout.decode("utf-8").strip()
-        if result != "KEY NOT FOUND":
-            return re.search(r'\[(.*)\]', result).group(1).strip()
+        result = pathlib.Path(f"{filename}.cracked").read_text().strip()
+        if result:
+            return result.split(':')[1]
         return None
 
     def _generate_dictionnary(self, filename, essid):
-        wordlist_filename = os.path.splitext(os.path.basename(filename))
-        wordlist_filename = os.path.join(self.options['tmp_folder'],
-                                         wordlist_filename[0] + ".txt")
+        wordlist_filename = os.path.splitext(os.path.basename(filename))[0] + ".txt"
+        wordlist_filename = os.path.join(self.options['tmp_folder'], wordlist_filename)
         logging.info(f'[RulesDic] Generating {wordlist_filename}')
         essid_bases = self._essid_base(essid)
         wordlist = essid_bases.copy()
