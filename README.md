@@ -1,5 +1,5 @@
 # pwnagotchi-rulesdic
-Plugins for pwnagotchi to run aircrack-ng on wordlist based on the ESSID. The main goal is to target weak wifi, like IoT or devices with default passwords.
+Plugins for pwnagotchi to run hashcat on wordlist based on the ESSID. The main goal is to target weak wifi, like IoT or devices with default passwords.
 For educational purpose only, run it on your OWN WIFI. 
 
 # Install
