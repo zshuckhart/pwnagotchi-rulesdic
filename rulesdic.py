@@ -117,7 +117,7 @@ class RulesDic(plugins.Plugin):
     def check_handcheck(self, filename):
         # Run hcxdumptool for a longer duration and with additional options
         hcxdumptool_execution = subprocess.run(
-            (f'nice /usr/bin/hcxdumptool -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication=1'),
+            (f'nice /usr/bin/hcxdumptool -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'),
             shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         result = hcxdumptool_execution.stdout.decode('utf-8').strip()
