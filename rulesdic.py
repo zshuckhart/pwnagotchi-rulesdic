@@ -12,10 +12,6 @@ import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
 
-crackable_re = re.compile(
-    r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+((\([1-9][0-9]* handshake(, with PMKID)?\))|(\(\d+ handshake, with PMKID\)))'
-)
-
 TEMPLATE = """
 {% extends "base.html" %}
 {% set active_page = "passwordsList" %}
