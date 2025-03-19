@@ -1,8 +1,3 @@
-Sure, I'll provide a complete example of the plugin code, including the necessary Flask application to serve the web page and the plugin integration with Pwnagotchi.
-
-Here's the complete code:
-
-```python
 import logging
 import os
 import re
