@@ -38,67 +38,63 @@ TEMPLATE = """
         }
         table, th, td {
             border: 1px solid;
-            border-collapse: collapse.
+            border-collapse: collapse;
         }
         th, td {
             padding: 15px;
-            text-align: left.
+            text-align: left;
         }
         @media screen and (max-width:700px) {
             table, tr, td {
-                padding:0.
-                border:1px solid.
+                padding:0;
+                border:1px solid;
             }
             table {
-                border:none.
+                border:none;
             }
             tr:first-child, thead, th {
-                display:none.
-                border:none.
+                display:none;
+                border:none;
             }
             tr {
-                float: left.
-                width: 100%.
-                margin-bottom: 2em.
+                float: left;
+                width: 100%;
+                margin-bottom: 2em;
             }
             td {
-                float: left.
-                width: 100%.
-                padding:1em.
+                float: left;
+                width: 100%;
+                padding:1em;
             }
             td::before {
-                content:attr(data-label).
-                word-wrap: break-word.
-                color: white.
-                border-right:2px solid.
-                width: 20%.
-                float:left.
-                padding:1em.
-                font-weight: bold.
-                margin:-1em 1em -1em -1em.
+                content:attr(data-label);
+                word-wrap: break-word;
+                color: white;
+                border-right:2px solid;
+                width: 20%;
+                float:left;
+                padding:1em;
+                font-weight: bold;
+                margin:-1em 1em -1em -1em;
             }
         }
     </style>
 {% endblock %}
 {% block script %}
-    var searchInput = document.getElementById("searchText").
+    var searchInput = document.getElementById('searchText');
     searchInput.onkeyup = function() {
-        var filter, table, tr, td, i, txtValue.
-        filter = searchInput.value.toUpperCase().
-        table = document.getElementById("tableOptions").
+        var filter = searchInput.value.toUpperCase();
+        var table = document.getElementById('tableOptions');
         if (table) {
-            tr = table.getElementsByTagName("tr").
-
-            for (i = 0.
-            i < tr.length.
-            i++) {
-                td = tr[i].getElementsByTagName("td")[0].
+            var tr = table.getElementsByTagName('tr');
+            for (var i = 0; i < tr.length; i++) {
+                var td = tr[i].getElementsByTagName('td')[0];
                 if (td) {
-                    txtValue = td.textContent || td.innerText.
+                    var txtValue = td.textContent || td.innerText;
                     if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                        tr[i].style.display = "".
-                    }else{
-                        tr[i].style.display = "none".
+                        tr[i].style.display = '';
+                    } else {
+                        tr[i].style.display = 'none';
                     }
                 }
             }
@@ -141,6 +137,11 @@ class RulesDic(plugins.Plugin):
         self.counter = 0
 
     def _load_status_file(self):
+        """
+        Load the status file. If it fails due to JSONDecodeError, remove the corrupted file and create a new one.
+        Returns:
+            StatusFile: The loaded or newly created status file.
+        """
         try:
             return StatusFile('/root/handshakes/.rulesdic', data_format='json')
         except JSONDecodeError:
@@ -158,8 +159,8 @@ class RulesDic(plugins.Plugin):
     def on_loaded(self):
         logging.info('[RulesDic] plugin loaded')
         check = subprocess.run(
-            '/usr/bin/dpkg -l hashcat | grep hashcat | awk \'{print $2, $3}\'',
-            shell=True, stdout=subprocess.PIPE
+            ['/usr/bin/dpkg', '-l', 'hashcat', '|', 'grep', 'hashcat', '|', 'awk', '{print $2, $3}'],
+            stdout=subprocess.PIPE
         )
         check = check.stdout.decode('utf-8').strip()
         if check != "hashcat <none>":
@@ -223,14 +224,18 @@ class RulesDic(plugins.Plugin):
         self.report.update(data={'reported': reported, 'excluded': excluded})
 
     def check_handcheck(self, filename, interface='wlan0mon'):
+        """
+        Check for handshakes with the given filename and interface.
+        Stops interfering processes and ensures the interface is up and in monitor mode.
+        """
         # Stop interfering processes
-        subprocess.run('sudo systemctl stop NetworkManager', shell=True)
-        subprocess.run('sudo systemctl stop wpa_supplicant', shell=True)
+        subprocess.run(['sudo', 'systemctl', 'stop', 'NetworkManager'])
+        subprocess.run(['sudo', 'systemctl', 'stop', 'wpa_supplicant'])
         
         # Ensure the interface is up and in monitor mode
-        subprocess.run(f'sudo ip link set {interface} down', shell=True)
-        subprocess.run(f'sudo iw dev {interface} set type monitor', shell=True)
-        subprocess.run(f'sudo ip link set {interface} up', shell=True)
+        subprocess.run(['sudo', 'ip', 'link', 'set', interface, 'down'])
+        subprocess.run(['sudo', 'iw', 'dev', interface, 'set', 'type', 'monitor'])
+        subprocess.run(['sudo', 'ip', 'link', 'set', interface, 'up'])
         
         # Run hcxdumptool for a longer duration and with additional options
         command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
@@ -257,6 +262,10 @@ class RulesDic(plugins.Plugin):
         return handshake_match
 
     def try_to_crack(self, filename, essid, bssid):
+        """
+        Try to crack the password using hashcat.
+        Generates a wordlist based on the ESSID and runs hashcat with the generated wordlist.
+        """
         wordlist_filename = self._generate_dictionnary(filename, essid)
         command = f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'
         subprocess.run(command, shell=True, stdout=subprocess.PIPE)
@@ -267,6 +276,10 @@ class RulesDic(plugins.Plugin):
         return None
 
     def _generate_dictionnary(self, filename, essid):
+        """
+        Generate a dictionary based on the ESSID.
+        Applies various rules such as reverse, punctuation, years, and leet transformations.
+        """
         wordlist_filename = os.path.join(self.options['tmp_folder'], f"{os.path.splitext(os.path.basename(filename))[0]}.txt")
         logging.info(f'[RulesDic] Generating {wordlist_filename}')
         essid_bases = self._essid_base(essid)
