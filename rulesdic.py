@@ -12,6 +12,7 @@ import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
 
+# HTML template for rendering the passwords list
 TEMPLATE = """
 {% extends "base.html" %}
 {% set active_page = "passwordsList" %}
@@ -121,6 +122,7 @@ TEMPLATE = """
 {% endblock %}
 """
 
+# Main plugin class for RulesDic
 class RulesDic(plugins.Plugin):
     __authors__ = 'fmatray, awwshucks'
     __version__ = '1.0.2'
@@ -130,6 +132,7 @@ class RulesDic(plugins.Plugin):
         'apt': ['hashcat'],
     }
 
+    # Initialize the plugin
     def __init__(self):
         self.report = self._load_status_file()
         self.options = self._initialize_options()
@@ -137,6 +140,7 @@ class RulesDic(plugins.Plugin):
         self.running = False
         self.counter = 0
 
+    # Load the status file or create a new one if it doesn't exist
     def _load_status_file(self):
         try:
             return StatusFile('/root/handshakes/.rulesdic', data_format='json')
@@ -144,14 +148,17 @@ class RulesDic(plugins.Plugin):
             os.remove('/root/handshakes/.rulesdic')
             return StatusFile('/root/handshakes/.rulesdic', data_format='json')
 
+    # Initialize default options for the plugin
     def _initialize_options(self):
         return {'exclude': [], 'tmp_folder': '/tmp', 'max_essid_len': 12, 'face': '(≡·≡)'}
 
+    # Initialize the list of years to be used in the wordlist
     def _initialize_years(self):
         years = list(map(str, range(1900, datetime.now().year + 1)))
         years.extend(map(str, range(0, 100)))
         return years
         
+    # Called when the plugin is loaded
     def on_loaded(self):
         logging.info('[RulesDic] plugin loaded')
         check = subprocess.run(
@@ -168,9 +175,11 @@ class RulesDic(plugins.Plugin):
             if check.stderr:
                 logging.error(f'Error: {check.stderr.decode("utf-8").strip()}')
 
+    # Called when the configuration changes
     def on_config_changed(self, config):
         self.options['handshakes'] = config['bettercap']['handshakes']
         
+    # Called when a new handshake is captured
     def on_handshake(self, agent, filename, access_point, client_station):
         if not self.running:
             return
@@ -228,6 +237,7 @@ class RulesDic(plugins.Plugin):
         reported.append(filename)
         self.report.update(data={'reported': reported, 'excluded': excluded})
 
+    # Update the progress status in the web interface
     def update_progress_status(self, filename, status):
         try:
             passwords = []
@@ -242,6 +252,7 @@ class RulesDic(plugins.Plugin):
             logging.error(f"[RulesDic] error while updating progress status: {e}")
             logging.debug(e, exc_info=True)
     
+    # Check if a valid handshake is captured
     def check_handcheck(self, filename, interface='wlan0mon'):
         command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
         hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -264,7 +275,8 @@ class RulesDic(plugins.Plugin):
         if not handshake_match:
             logging.warning('[RulesDic] No handshake found with initial pattern, trying alternative pattern...')
             return handshake_match    
-    
+
+    # Try to crack the captured handshake using hashcat
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionnary(filename, essid)
         command = f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'
@@ -275,6 +287,7 @@ class RulesDic(plugins.Plugin):
             return result.split(':')[1]
         return None
 
+    # Generate a dictionary for hashcat to use based on the ESSID
     def _generate_dictionnary(self, filename, essid):
         wordlist_filename = os.path.join(self.options['tmp_folder'], f"{os.path.splitext(os.path.basename(filename))[0]}.txt")
         logging.info(f'[RulesDic] Generating {wordlist_filename}')
@@ -291,12 +304,15 @@ class RulesDic(plugins.Plugin):
         logging.info(f'[RulesDic] {len(wordlist)} password generated')
         return wordlist_filename
 
+    # Generate base words based on ESSID
     def _essid_base(self, essid):
         return [essid, essid.upper(), essid.lower(), essid.capitalize(), re.sub('[0-9]*$', "", essid)]
 
+    # Generate words by reversing the base words
     def _reverse_rule(self, base_essids):
         return [essid[::-1] for essid in base_essids]
 
+    # Generate words by adding punctuation to the base words
     def _punctuation_rule(self, base_essids):
         wd = ["".join(p) for p in product(base_essids, punctuation)]
         wd += ["".join(p) for p in product(base_essids, punctuation, punctuation)]
@@ -304,12 +320,14 @@ class RulesDic(plugins.Plugin):
         wd += ["".join(p) for p in product(punctuation, base_essids, punctuation)]
         return wd
 
+    # Generate words by adding years to the base words
     def _years_rule(self, base_essids):
         wd = ["".join(p) for p in product(base_essids, self.years)]
         wd += ["".join(p) for p in product(base_essids, self.years, punctuation)]
         wd += ["".join(p) for p in product(base_essids, punctuation, self.years)]
         return wd
 
+    # Generate leet words based on the ESSID
     def _leet_rule(self, essid):
         leet_dict = {
             'a': ['4', '@', 'a', 'A'], 'b': ['8', '6', 'b', 'B'], 'c': ['(', '<', '{', '[', 'c', 'C'], 'd': ['d', 'D'],
@@ -323,6 +341,7 @@ class RulesDic(plugins.Plugin):
         transformations = [leet_dict.get(c, c) for c in essid.lower()]
         return [''.join(p) for p in product(*transformations)]
 
+    # Handle webhooks for the plugin
     def on_webhook(self, path, request):
         if not self.running:
             return
