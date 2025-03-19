@@ -254,28 +254,36 @@ class RulesDic(plugins.Plugin):
     
     # Check if a valid handshake is captured
     def check_handcheck(self, filename, interface='wlan0mon'):
+        # Ensure the interface is in monitor mode
+        check_mode_command = f'iwconfig {interface}'
+        mode_check = subprocess.run(check_mode_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if b'Monitor' not in mode_check.stdout:
+            # If not in monitor mode, set it
+            start_monitor_mode = f'sudo airmon-ng start {interface[:-3]}'
+            subprocess.run(start_monitor_mode, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
         command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
         hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         result = hcxdumptool_execution.stdout.decode('utf-8').strip()
-        
+            
         if hcxdumptool_execution.stderr:
             logging.warning(f'[RulesDic] hcxdumptool stderr: {hcxdumptool_execution.stderr.decode("utf-8").strip()}')
-            
+                
         for _ in range(3):
             if result:
-                break
+                break    
             logging.info('[RulesDic] Retry capturing handshake...')
             hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             result = hcxdumptool_execution.stdout.decode('utf-8').strip()
-            
+                        
         enhanced_handshake_re = re.compile(
             r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+(?:\([1-9][0-9]* handshake(?:, with PMKID)?\)|\(\d+ handshake(?:, with PMKID)?\)|handshake|PMKID)')
         handshake_match = enhanced_handshake_re.search(result)
-        
+                        
         if not handshake_match:
             logging.warning('[RulesDic] No handshake found with initial pattern, trying alternative pattern...')
-            return handshake_match    
-
+        return handshake_match
+    
     # Try to crack the captured handshake using hashcat
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionnary(filename, essid)
