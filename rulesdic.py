@@ -155,13 +155,12 @@ class RulesDic(plugins.Plugin):
         years = list(map(str, range(1900, datetime.now().year + 1)))
         years.extend(map(str, range(0, 100)))
         return years
-
+        
     def on_loaded(self):
         logging.info('[RulesDic] plugin loaded')
         check = subprocess.run(
             '/usr/bin/dpkg -l hashcat | grep hashcat | gawk \'{print $2, $3}\'',
             shell=True,
-            stdout=subprocess.PIPE,
             stdout=subprocess.PIPE
         )
         check_output = check.stdout.decode('utf-8').strip()
