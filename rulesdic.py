@@ -159,15 +159,19 @@ class RulesDic(plugins.Plugin):
     def on_loaded(self):
         logging.info('[RulesDic] plugin loaded')
         check = subprocess.run(
-            ['/usr/bin/dpkg', '-l', 'hashcat', '|', 'grep', 'hashcat', '|', 'gawk', '{print $2, $3}'],
+            '/usr/bin/dpkg -l hashcat | grep hashcat | gawk \'{print $2, $3}\'',
+            shell=True,
+            stdout=subprocess.PIPE,
             stdout=subprocess.PIPE
         )
-        check = check.stdout.decode('utf-8').strip()
-        if check != "hashcat <none>":
-            logging.info('[RulesDic] Found %s' % check)
+        check_output = check.stdout.decode('utf-8').strip()
+        if check.returncode == 0 and check_output != "hashcat <none>":
+            logging.info('[RulesDic] Found %s' % check_output)
             self.running = True
         else:
-            logging.warning('[RulesDic] hashcat is not installed!')
+            logging.warning('[RulesDic] hashcat is not installed or there was an error!')
+            if check.stderr:
+                logging.error(f'Error: {check.stderr.decode("utf-8").strip()}')
 
     def on_config_changed(self, config):
         self.options['handshakes'] = config['bettercap']['handshakes']
