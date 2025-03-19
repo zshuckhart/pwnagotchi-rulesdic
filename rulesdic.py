@@ -220,6 +220,7 @@ class RulesDic(plugins.Plugin):
         display.set('status', 'Cracking in progress...')
         self.update_progress_status(filename, 'Cracking in progress...')
         self.crack_attempts += 1  # Increment crack attempts counter
+        logging.info(f'[RulesDic] Crack attempts incremented: {self.crack_attempts}')  # Log crack attempts
 
         pwd = self.try_to_crack(filename, essid, bssid)
         duration = (datetime.now() - current_time).total_seconds()
