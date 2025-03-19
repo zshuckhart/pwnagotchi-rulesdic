@@ -159,7 +159,7 @@ class RulesDic(plugins.Plugin):
     def on_loaded(self):
         logging.info('[RulesDic] plugin loaded')
         check = subprocess.run(
-            ['/usr/bin/dpkg', '-l', 'hashcat', '|', 'grep', 'hashcat', '|', 'awk', '{print $2, $3}'],
+            ['/usr/bin/dpkg', '-l', 'hashcat', '|', 'grep', 'hashcat', '|', 'gawk', '{print $2, $3}'],
             stdout=subprocess.PIPE
         )
         check = check.stdout.decode('utf-8').strip()
