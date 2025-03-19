@@ -115,6 +115,7 @@ TEMPLATE = """
         <p id="progressMessage">Cracking in progress...</p>
     </div>
     <p id="crackAttempts">Handshakes Cracks Attempted: {{ crack_attempts }}</p>
+    <a href="/passwords">View Cracked Passwords</a> <!-- Added link -->
     <table id="tableOptions">
         <thead>
             <tr>
