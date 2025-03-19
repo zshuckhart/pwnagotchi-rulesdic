@@ -368,24 +368,23 @@ class RulesDic(plugins.Plugin):
         }
         transformations = [leet_dict.get(c, c) for c in essid.lower()]
         return [''.join(p) for p in product(*transformations)]
-
-    # Handle webhooks for the plugin
-	def on_webhook(self, path, request):
-		if not self.running:
-			return
-		if path == "/" or not path:
-			try:
-				passwords = []
-				cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
-				for cracked_file in cracked_files:
-					ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
-					with open(cracked_file, 'r') as f:
-						pwd = f.read()
-					passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": status})
-				return render_template_string(TEMPLATE, title="Passwords list", passwords=passwords, crack_attempts=self.crack_attempts)
-			except Exception as e:
-				logging.error(f"[RulesDic] error while updating progress status: {e}")
-				logging.debug(e, exc_info=True)			
+	    
+    def on_webhook(self, path, request): # Handle webhooks for the plugin
+        if not self.running:
+            return
+        if path == "/" or not path:
+            try:
+                passwords = []
+                cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
+                for cracked_file in cracked_files:
+                    ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
+                    with open(cracked_file, 'r') as f:
+                        pwd = f.read()
+                    passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": "Cracked"})
+                return render_template_string(TEMPLATE, title="Passwords list", passwords=passwords, crack_attempts=self.crack_attempts)
+            except Exception as e:
+                logging.error(f"[RulesDic] error while updating progress status: {e}")
+                logging.debug(e, exc_info=True)
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
