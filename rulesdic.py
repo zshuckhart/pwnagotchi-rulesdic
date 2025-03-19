@@ -84,7 +84,7 @@ TEMPLATE = """
         var table = document.getElementById('tableOptions');
         if (table) {
             var tr = table.getElementsByTagName('tr');
-            for (var i = 0; i < tr.length; i++) {
+            for (var i = 0; tr.length; i++) {
                 var td = tr[i].getElementsByTagName('td')[0];
                 if (td) {
                     var txtValue = td.textContent || td.innerText;
