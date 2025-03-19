@@ -373,3 +373,7 @@ class RulesDic(plugins.Plugin):
                     with open(cracked_file, 'r') as f:
                         pwd = f.read()
                     passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": status})
+                return render_template_string(TEMPLATE, title="Passwords list", passwords=passwords, crack_attempts=self.crack_attempts)
+            except Exception as e:
+                logging.error(f"[RulesDic] error while updating progress status: {e}")
+                logging.debug(e, exc_info=True)
