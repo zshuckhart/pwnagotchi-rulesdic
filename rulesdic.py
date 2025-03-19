@@ -157,7 +157,7 @@ class RulesDic(plugins.Plugin):
     # Initialize the list of years to be used in the wordlist
     def _initialize_years(self):
         years = list(map(str, range(1900, datetime.now().year + 1)))
-        years extend(map(str, range(0, 100)))
+        years.extend(map(str, range(0, 100)))
         return years
         
     # Called when the plugin is loaded
