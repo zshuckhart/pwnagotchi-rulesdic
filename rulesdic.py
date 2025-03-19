@@ -244,7 +244,7 @@ class RulesDic(plugins.Plugin):
             return render_template_string(TEMPLATE, title="Passwords list", passwords=passwords)
         except Exception as e:
             logging.error(f"[RulesDic] error while updating progress status: {e}")
-            logging.debug(e, exc_info=True
+            logging.debug(e, exc_info=True)
                           
     def check_handcheck(self, filename, interface='wlan0mon'):
         command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
