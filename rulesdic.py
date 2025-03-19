@@ -1,4 +1,4 @@
-wlpimport logging
+import logging
 import os
 import re
 import subprocess
@@ -38,65 +38,67 @@ TEMPLATE = """
         }
         table, th, td {
             border: 1px solid;
-            border-collapse: collapse;
+            border-collapse: collapse.
         }
         th, td {
             padding: 15px;
-            text-align: left;
+            text-align: left.
         }
         @media screen and (max-width:700px) {
             table, tr, td {
-                padding:0;
-                border:1px solid;
+                padding:0.
+                border:1px solid.
             }
             table {
-                border:none;
+                border:none.
             }
             tr:first-child, thead, th {
-                display:none;
-                border:none;
+                display:none.
+                border:none.
             }
             tr {
-                float: left;
-                width: 100%;
-                margin-bottom: 2em;
+                float: left.
+                width: 100%.
+                margin-bottom: 2em.
             }
             td {
-                float: left;
-                width: 100%;
-                padding:1em;
+                float: left.
+                width: 100%.
+                padding:1em.
             }
             td::before {
-                content:attr(data-label);
-                word-wrap: break-word;
-                color: white;
-                border-right:2px solid;
-                width: 20%;
-                float:left;
-                padding:1em;
-                font-weight: bold;
-                margin:-1em 1em -1em -1em;
+                content:attr(data-label).
+                word-wrap: break-word.
+                color: white.
+                border-right:2px solid.
+                width: 20%.
+                float:left.
+                padding:1em.
+                font-weight: bold.
+                margin:-1em 1em -1em -1em.
             }
         }
     </style>
 {% endblock %}
 {% block script %}
-    var searchInput = document.getElementById("searchText");
+    var searchInput = document.getElementById("searchText").
     searchInput.onkeyup = function() {
-        var filter, table, tr, td, i, txtValue;
-        filter = searchInput.value.toUpperCase();
-        table = document.getElementById("tableOptions");
+        var filter, table, tr, td, i, txtValue.
+        filter = searchInput.value.toUpperCase().
+        table = document.getElementById("tableOptions").
         if (table) {
-            tr = table.getElementsByTagName("tr");
+            tr = table.getElementsByTagName("tr").
 
-            for (i = 0; i < tr.length; i++) {
-                td = tr[i].getElementsByTagName("td")[0];
+            for (i = 0.
+            i < tr.length.
+            i++) {
+                td = tr[i].getElementsByTagName("td")[0].
                 if (td) {
-                    txtValue = td.textContent || td.innerText;
+                    txtValue = td.textContent || td.innerText.
                     if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                        tr[i].style.display = "";
+                        tr[i].style.display = "".
                     }else{
-                        tr[i].style.display = "none";
+                        tr[i].style.display = "none".
                     }
                 }
             }
@@ -192,7 +194,7 @@ class RulesDic(plugins.Plugin):
         logging.info(f'[RulesDic] New handshake {filename}')
         current_time = datetime.now()
 
-        result = self.check_handshake(filename)
+        result = self.check_handcheck(filename)
         if not result:
             logging.info('[RulesDic] No handshake')
             display.set('face', self.options['face'])
@@ -201,8 +203,8 @@ class RulesDic(plugins.Plugin):
 
         bssid = result.group('bssid')
         display.set('face', self.options['face'])
-        display.set('status', 'handshake found')
-        logging.info('[RulesDic] handshake confirmed')
+        display.set('status', 'Handshake found')
+        logging.info('[RulesDic] Handshake confirmed')
         pwd = self.try_to_crack(filename, essid, bssid)
         duration = (datetime.now() - current_time).total_seconds()
 
@@ -220,7 +222,16 @@ class RulesDic(plugins.Plugin):
         reported.append(filename)
         self.report.update(data={'reported': reported, 'excluded': excluded})
 
-    def check_handshake(self, filename, interface='wlan0mon'):
+    def check_handcheck(self, filename, interface='wlan0mon'):
+        # Stop interfering processes
+        subprocess.run('sudo systemctl stop NetworkManager', shell=True)
+        subprocess.run('sudo systemctl stop wpa_supplicant', shell=True)
+        
+        # Ensure the interface is up and in monitor mode
+        subprocess.run(f'sudo ip link set {interface} down', shell=True)
+        subprocess.run(f'sudo iw dev {interface} set type monitor', shell=True)
+        subprocess.run(f'sudo ip link set {interface} up', shell=True)
+        
         # Run hcxdumptool for a longer duration and with additional options
         command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
         hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -232,18 +243,18 @@ class RulesDic(plugins.Plugin):
         for _ in range(3):
             if result:
                 break
-            logging.info('[RulesDic] Retry capturing ...')
+            logging.info('[RulesDic] Retry capturing handshake...')
             hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             result = hcxdumptool_execution.stdout.decode('utf-8').strip()
 
-        enhanced__re = re.compile(
-            r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+(?:\([1-9][0-9]* (?:, with PMKID)?\)|\(\d+ (?:, with PMKID)?\)||PMKID)')
-        _match = enhanced__re.search(result)
+        enhanced_handshake_re = re.compile(
+            r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+(?:\([1-9][0-9]* handshake(?:, with PMKID)?\)|\(\d+ handshake(?:, with PMKID)?\)|handshake|PMKID)')
+        handshake_match = enhanced_handshake_re.search(result)
 
-        if not _match:
-            logging.warning('[RulesDic] No  found with initial pattern, trying alternative pattern...')
+        if not handshake_match:
+            logging.warning('[RulesDic] No handshake found with initial pattern, trying alternative pattern...')
 
-        return _match
+        return handshake_match
 
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionnary(filename, essid)
@@ -309,7 +320,7 @@ class RulesDic(plugins.Plugin):
         if path == "/" or not path:
             try:
                 passwords = []
-                cracked_files = pathlib.Path('/home/pi/s/').glob('*.cracked')
+                cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
                 for cracked_file in cracked_files:
                     ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
                     with open(cracked_file, 'r') as f:
