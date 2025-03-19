@@ -16,15 +16,18 @@ from json.decoder import JSONDecodeError
 TEMPLATE = """
 {% extends "base.html" %}
 {% set active_page = "passwordsList" %}
+
 {% block title %}
     {{ title }}
 {% endblock %}
+
 {% block meta %}
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=0" />
 {% endblock %}
+
 {% block styles %}
-{{ super() }}
+    {{ super() }}
     <style>
         #searchText {
             width: 100%;
@@ -32,26 +35,25 @@ TEMPLATE = """
         table {
             table-layout: auto;
             width: 100%;
-        }
-        table, th, td {
             border: 1px solid;
             border-collapse: collapse;
         }
         th, td {
             padding: 15px;
             text-align: left;
+            border: 1px solid;
         }
         @media screen and (max-width:700px) {
             table, tr, td {
-                padding:0;
-                border:1px solid;
+                padding: 0;
+                border: 1px solid;
             }
             table {
-                border:none;
+                border: none;
             }
             tr:first-child, thead, th {
-                display:none;
-                border:none;
+                display: none;
+                border: none;
             }
             tr {
                 float: left;
@@ -61,43 +63,49 @@ TEMPLATE = """
             td {
                 float: left;
                 width: 100%;
-                padding:1em;
+                padding: 1em;
             }
             td::before {
-                content:attr(data-label);
+                content: attr(data-label);
                 word-wrap: break-word;
                 color: white;
-                border-right:2px solid;
+                border-right: 2px solid;
                 width: 20%;
-                float:left;
-                padding:1em;
+                float: left;
+                padding: 1em;
                 font-weight: bold;
-                margin:-1em 1em -1em -1em;
+                margin: -1em 1em -1em -1em;
             }
         }
     </style>
 {% endblock %}
+
 {% block script %}
-    var searchInput = document.getElementById('searchText');
-    searchInput.onkeyup = function() {
-    var filter = searchInput.value.toUpperCase();
-    var table = document.getElementById('tableOptions');
-    if (table) {
-        var tr = table.getElementsByTagName('tr');
-        for (var i = 0; i < tr.length; i++) {
-            var td = tr[i].getElementsByTagName('td')[0];
-            if (td) {
-                var txtValue = td.textContent || td.innerText;
-                if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                    tr[i].style.display = '';
-                } else {
-                    tr[i].style.display = 'none';
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var searchInput = document.getElementById('searchText');
+            searchInput.onkeyup = function() {
+                var filter = searchInput.value.toUpperCase();
+                var table = document.getElementById('tableOptions');
+                if (table) {
+                    var tr = table.getElementsByTagName('tr');
+                    for (var i = 0; i < tr.length; i++) {
+                        var td = tr[i].getElementsByTagName('td')[0];
+                        if (td) {
+                            var txtValue = td.textContent || td.innerText;
+                            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                                tr[i].style.display = '';
+                            } else {
+                                tr[i].style.display = 'none';
+                            }
+                        }
+                    }
                 }
             }
-        }
-    }
-}
+        });
+    </script>
 {% endblock %}
+
 {% block content %}
     <input type="text" id="searchText" placeholder="Search for ..." title="Type in a filter">
     <div id="progressStatus" style="display: none;">
@@ -105,20 +113,24 @@ TEMPLATE = """
     </div>
     <p id="crackAttempts">Handshakes Cracks Attempted: {{ crack_attempts }}</p>
     <table id="tableOptions">
-        <tr>
-            <th>SSID</th>
-            <th>BSSID</th>
-            <th>Password</th>
-            <th>Status</th>
-        </tr>
-        {% for p in passwords %}
+        <thead>
             <tr>
-                <td data-label="SSID">{{p["ssid"]}}</td>
-                <td data-label="BSSID">{{p["bssid"]}}</td>
-                <td data-label="Password">{{p["password"]}}</td>
-                <td data-label="Status">{{p["status"]}}</td>
+                <th>SSID</th>
+                <th>BSSID</th>
+                <th>Password</th>
+                <th>Status</th>
             </tr>
-        {% endfor %}
+        </thead>
+        <tbody>
+            {% for p in passwords %}
+                <tr>
+                    <td data-label="SSID">{{ p["ssid"] }}</td>
+                    <td data-label="BSSID">{{ p["bssid"] }}</td>
+                    <td data-label="Password">{{ p["password"] }}</td>
+                    <td data-label="Status">{{ p["status"] }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
     </table>
 {% endblock %}
 """
