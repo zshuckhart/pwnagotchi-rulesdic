@@ -370,4 +370,6 @@ class RulesDic(plugins.Plugin):
                 cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
                 for cracked_file in cracked_files:
                     ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
-                    with open(cracked_file, 'r')
+                    with open(cracked_file, 'r') as f:
+                        pwd = f.read()
+                    passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": status})
