@@ -1,3 +1,8 @@
+Sure, I'll provide a complete example of the plugin code, including the necessary Flask application to serve the web page and the plugin integration with Pwnagotchi.
+
+Here's the complete code:
+
+```python
 import logging
 import os
 import re
@@ -6,11 +11,13 @@ import pathlib
 from itertools import product
 from datetime import datetime
 from string import punctuation
-from flask import render_template_string
+from flask import Flask, render_template_string
 
 import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
+
+app = Flask(__name__)
 
 # HTML template for rendering the passwords list
 TEMPLATE = """
@@ -43,7 +50,7 @@ TEMPLATE = """
             text-align: left;
             border: 1px solid;
         }
-        @media screen and (max-width:700px) {
+        @media screen and (max-width: 700px) {
             table, tr, td {
                 padding: 0;
                 border: 1px solid;
@@ -93,11 +100,7 @@ TEMPLATE = """
                         var td = tr[i].getElementsByTagName('td')[0];
                         if (td) {
                             var txtValue = td.textContent || td.innerText;
-                            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                                tr[i].style.display = '';
-                            } else {
-                                tr[i].style.display = 'none';
-                            }
+                            tr[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? '' : 'none';
                         }
                     }
                 }
@@ -135,7 +138,17 @@ TEMPLATE = """
 {% endblock %}
 """
 
-# Main plugin class for RulesDic
+@app.route('/passwords')
+def passwords_page():
+    passwords = []
+    cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
+    for cracked_file in cracked_files:
+        ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
+        with open(cracked_file, 'r') as f:
+            pwd = f.read()
+        passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": "Cracked"})
+    return render_template_string(TEMPLATE, title="Passwords List", passwords=passwords, crack_attempts=0)
+
 class RulesDic(plugins.Plugin):
     __authors__ = 'fmatray, awwshucks'
     __version__ = '1.0.2'
@@ -145,7 +158,6 @@ class RulesDic(plugins.Plugin):
         'apt': ['hashcat'],
     }
 
-    # Initialize the plugin
     def __init__(self):
         self.report = self._load_status_file()
         self.options = self._initialize_options()
@@ -154,7 +166,6 @@ class RulesDic(plugins.Plugin):
         self.counter = 0
         self.crack_attempts = 0  # Add a counter for crack attempts
 
-    # Load the status file or create a new one if it doesn't exist
     def _load_status_file(self):
         try:
             return StatusFile('/root/handshakes/.rulesdic', data_format='json')
@@ -162,17 +173,14 @@ class RulesDic(plugins.Plugin):
             os.remove('/root/handshakes/.rulesdic')
             return StatusFile('/root/handshakes/.rulesdic', data_format='json')
 
-    # Initialize default options for the plugin
     def _initialize_options(self):
         return {'exclude': [], 'tmp_folder': '/tmp', 'max_essid_len': 12, 'face': '(≡·≡)'}
 
-    # Initialize the list of years to be used in the wordlist
     def _initialize_years(self):
         years = list(map(str, range(1900, datetime.now().year + 1)))
         years.extend(map(str, range(0, 100)))
         return years
-        
-    # Called when the plugin is loaded
+
     def on_loaded(self):
         logging.info('[RulesDic] plugin loaded')
         check = subprocess.run(
@@ -189,75 +197,72 @@ class RulesDic(plugins.Plugin):
             if check.stderr:
                 logging.error(f'Error: {check.stderr.decode("utf-8").strip()}')
 
-    # Called when the configuration changes
     def on_config_changed(self, config):
         self.options['handshakes'] = config['bettercap']['handshakes']
-        
-    # Called when a new handshake is captured
-def on_handshake(self, agent, filename, access_point, client_station):
-    if not self.running:
-        logging.info('[RulesDic] Plugin not running, handshake ignored')
-        return
 
-    logging.info(f'[RulesDic] Processing handshake for {filename}')
-    reported = self.report.data_field_or('reported', default=[])
-    excluded = self.report.data_field_or('excluded', default=[])
-    essid = os.path.splitext(os.path.basename(filename))[0].split("_")[0]
-    if filename in reported:
-        logging.info(f'[RulesDic] {filename} already processed')
-        return
+    def on_handshake(self, agent, filename, access_point, client_station):
+        if not self.running:
+            logging.info('[RulesDic] Plugin not running, handshake ignored')
+            return
 
-    if filename in excluded or any(re.match(pattern, essid) for pattern in self.options['exclude']):
-        excluded.append(filename)
+        logging.info(f'[RulesDic] Processing handshake for {filename}')
+        reported = self.report.data_field_or('reported', default=[])
+        excluded = self.report.data_field_or('excluded', default=[])
+        essid = os.path.splitext(os.path.basename(filename))[0].split("_")[0]
+        if filename in reported:
+            logging.info(f'[RulesDic] {filename} already processed')
+            return
+
+        if filename in excluded or any(re.match(pattern, essid) for pattern in self.options['exclude']):
+            excluded.append(filename)
+            self.report.update(data={'reported': reported, 'excluded': excluded})
+            logging.info(f'[RulesDic] {filename} excluded')
+            return
+
+        display = agent.view()
+        display.set('face', self.options['face'])
+        display.set('status', 'Captured new handshake')
+        logging.info(f'[RulesDic] New handshake {filename}')
+        current_time = datetime.now()
+
+        result = self.check_handcheck(filename)
+        if not result:
+            logging.info('[RulesDic] No handshake')
+            display.set('face', self.options['face'])
+            display.set('status', 'No handshake found, next time perhaps...')
+            return
+
+        bssid = result.group('bssid')
+        display.set('face', self.options['face'])
+        display.set('status', 'Handshake found')
+        logging.info('[RulesDic] Handshake confirmed')
+
+        display.set('status', 'Cracking in progress...')
+        self.update_progress_status(filename, 'Cracking in progress...')
+        logging.info('[RulesDic] Before incrementing crack attempts')
+        self.crack_attempts += 1  # Increment crack attempts counter
+        logging.info(f'[RulesDic] Crack attempts incremented: {self.crack_attempts}')  # Log crack attempts
+
+        pwd = self.try_to_crack(filename, essid, bssid)
+        duration = (datetime.now() - current_time).total_seconds()
+
+        if not pwd:
+            display.set('face', self.options['face'])
+            display.set('status', f'Password not found for {essid} :\'()')
+            self.update_progress_status(filename, 'Password not found')
+            logging.warning(
+                f'!!! [RulesDic] !!! Key not found for {essid} in {duration // 60:.0f}min and {duration % 60:.0f}s')
+        else:
+            display.set('face', self.options['face'])
+            display.set('status', f'Password cracked for {essid} :\'()')
+            self.update_progress_status(filename, 'Password cracked')
+            logging.warning(
+                f'!!! [RulesDic] !!! Cracked password for {essid}: {pwd}. Found in {duration // 60:.0f}min and {duration % 60:.0f}s')
+
+        reported.append(filename)
         self.report.update(data={'reported': reported, 'excluded': excluded})
-        logging.info(f'[RulesDic] {filename} excluded')
-        return
+        self.update_progress_status(filename, 'Handshake cracks attempted: {}'.format(self.crack_attempts))  # Update progress status with crack attempts
 
-    display = agent.view()
-    display.set('face', self.options['face'])
-    display.set('status', 'Captured new handshake')
-    logging.info(f'[RulesDic] New handshake {filename}')
-    current_time = datetime.now()
-
-    result = self.check_handcheck(filename)
-    if not result:
-        logging.info('[RulesDic] No handshake')
-        display.set('face', self.options['face'])
-        display.set('status', 'No handshake found, next time perhaps...')
-        return
-
-    bssid = result.group('bssid')
-    display.set('face', self.options['face'])
-    display.set('status', 'Handshake found')
-    logging.info('[RulesDic] Handshake confirmed')
-
-    display.set('status', 'Cracking in progress...')
-    self.update_progress_status(filename, 'Cracking in progress...')
-    logging.info('[RulesDic] Before incrementing crack attempts')
-    self.crack_attempts += 1  # Increment crack attempts counter
-    logging.info(f'[RulesDic] Crack attempts incremented: {self.crack_attempts}')  # Log crack attempts
-
-    pwd = self.try_to_crack(filename, essid, bssid)
-    duration = (datetime.now() - current_time).total_seconds()
-
-    if not pwd:
-        display.set('face', self.options['face'])
-        display.set('status', f'Password not found for {essid} :\'()')
-        self.update_progress_status(filename, 'Password not found')
-        logging.warning(
-            f'!!! [RulesDic] !!! Key not found for {essid} in {duration // 60:.0f}min and {duration % 60:.0f}s')
-    else:
-        display.set('face', self.options['face'])
-        display.set('status', f'Password cracked for {essid} :\'()')
-        self.update_progress_status(filename, 'Password cracked')
-        logging.warning(
-            f'!!! [RulesDic] !!! Cracked password for {essid}: {pwd}. Found in {duration // 60:.0f}min and {duration % 60:.0f}s')
-
-    reported.append(filename)
-    self.report.update(data={'reported': reported, 'excluded': excluded})
-    self.update_progress_status(filename, 'Handshake cracks attempted: {}'.format(self.crack_attempts))  # Update progress status with crack attempts
-    
-    # Update the progress status in the web interface
     def update_progress_status(self, filename, status):
         try:
             passwords = []
@@ -271,8 +276,7 @@ def on_handshake(self, agent, filename, access_point, client_station):
         except Exception as e:
             logging.error(f"[RulesDic] error while updating progress status: {e}")
             logging.debug(e, exc_info=True)
-    
-    # Check if a valid handshake is captured
+
     def check_handcheck(self, filename, interface='wlan0mon'):
         # Ensure the interface is in monitor mode
         check_mode_command = f'iwconfig {interface}'
@@ -309,8 +313,7 @@ def on_handshake(self, agent, filename, access_point, client_station):
         if not handshake_match:
             logging.warning('[RulesDic] No handshake found with initial pattern, trying alternative pattern...')
         return handshake_match
-    
-    # Try to crack the captured handshake using hashcat
+
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionnary(filename, essid)
         command = f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'
@@ -322,7 +325,6 @@ def on_handshake(self, agent, filename, access_point, client_station):
             return result.split(':')[1]
         return None
 
-    # Generate a dictionary for hashcat to use based on the ESSID
     def _generate_dictionnary(self, filename, essid):
         wordlist_filename = os.path.join(self.options['tmp_folder'], f"{os.path.splitext(os.path.basename(filename))[0]}.txt")
         logging.info(f'[RulesDic] Generating {wordlist_filename}')
@@ -339,15 +341,12 @@ def on_handshake(self, agent, filename, access_point, client_station):
         logging.info(f'[RulesDic] {len(wordlist)} password generated')
         return wordlist_filename
 
-    # Generate base words based on ESSID
     def _essid_base(self, essid):
         return [essid, essid.upper(), essid.lower(), essid.capitalize(), re.sub('[0-9]*$', "", essid)]
 
-    # Generate words by reversing the base words
     def _reverse_rule(self, base_essids):
         return [essid[::-1] for essid in base_essids]
 
-    # Generate words by adding punctuation to the base words
     def _punctuation_rule(self, base_essids):
         wd = ["".join(p) for p in product(base_essids, punctuation)]
         wd += ["".join(p) for p in product(base_essids, punctuation, punctuation)]
@@ -355,14 +354,12 @@ def on_handshake(self, agent, filename, access_point, client_station):
         wd += ["".join(p) for p in product(punctuation, base_essids, punctuation)]
         return wd
 
-    # Generate words by adding years to the base words
     def _years_rule(self, base_essids):
         wd = ["".join(p) for p in product(base_essids, self.years)]
         wd += ["".join(p) for p in product(base_essids, self.years, punctuation)]
         wd += ["".join(p) for p in product(base_essids, punctuation, self.years)]
         return wd
 
-    # Generate leet words based on the ESSID
     def _leet_rule(self, essid):
         leet_dict = {
             'a': ['4', '@', 'a', 'A'], 'b': ['8', '6', 'b', 'B'], 'c': ['(', '<', '{', '[', 'c', 'C'], 'd': ['d', 'D'],
@@ -377,19 +374,22 @@ def on_handshake(self, agent, filename, access_point, client_station):
         return [''.join(p) for p in product(*transformations)]
 
     # Handle webhooks for the plugin
-    def on_webhook(self, path, request):
-        if not self.running:
-            return
-        if path == "/" or not path:
-            try:
-                passwords = []
-                cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
-                for cracked_file in cracked_files:
-                    ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
-                    with open(cracked_file, 'r') as f:
-                        pwd = f.read()
-                    passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": status})
-                return render_template_string(TEMPLATE, title="Passwords list", passwords=passwords, crack_attempts=self.crack_attempts)
-            except Exception as e:
-                logging.error(f"[RulesDic] error while updating progress status: {e}")
-                logging.debug(e, exc_info=True)
+	def on_webhook(self, path, request):
+		if not self.running:
+			return
+		if path == "/" or not path:
+			try:
+				passwords = []
+				cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
+				for cracked_file in cracked_files:
+					ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
+					with open(cracked_file, 'r') as f:
+						pwd = f.read()
+					passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": status})
+				return render_template_string(TEMPLATE, title="Passwords list", passwords=passwords, crack_attempts=self.crack_attempts)
+			except Exception as e:
+				logging.error(f"[RulesDic] error while updating progress status: {e}")
+				logging.debug(e, exc_info=True)			
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5000)
