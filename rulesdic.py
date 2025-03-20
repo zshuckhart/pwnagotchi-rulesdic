@@ -12,8 +12,6 @@ import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
 
-app = Flask(__name__)
-
 # HTML template for rendering the passwords list
 TEMPLATE = """
 {% extends "base.html" %}
@@ -132,18 +130,6 @@ TEMPLATE = """
     </table>
 {% endblock %}
 """
-
-@app.route('/passwords')
-def passwords_page():
-    passwords = []
-    cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
-    for cracked_file in cracked_files:
-        ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
-        with open(cracked_file, 'r') as f:
-            pwd = f.read()
-        passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": "Cracked"})
-    return render_template_string(TEMPLATE, title="Passwords List", passwords=passwords, crack_attempts=0)
-
 class RulesDic(plugins.Plugin):
     __authors__ = 'fmatray, awwshucks'
     __version__ = '1.0.2'
@@ -384,6 +370,3 @@ class RulesDic(plugins.Plugin):
             except Exception as e:
                 logging.error(f"[RulesDic] error while updating progress status: {e}")
                 logging.debug(e, exc_info=True)
-
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
