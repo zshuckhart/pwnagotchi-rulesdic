@@ -164,34 +164,44 @@ class RulesDic(plugins.Plugin):
 
     def on_loaded(self):
         logging.info('[RulesDic] plugin loaded')
-        check = subprocess.run(
-            '/usr/bin/dpkg -l hashcat | grep hashcat | gawk \'{print $2, $3}\'',
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        check_output = check.stdout.decode('utf-8').strip()
-        if check.returncode == 0 and check_output != "hashcat <none>":
-            logging.info('[RulesDic] Found %s' % check_output)
-            self.running = True
-        else:
-            logging.warning('[RulesDic] hashcat is not installed or there was an error!')
-            if check.stderr:
-                logging.error(f'Error: {check.stderr.decode("utf-8").strip()}')
-        
-            logging.info('[RulesDic] Attempting to install hashcat...')
-            install = subprocess.run(
-                'sudo apt-get update && sudo apt-get install -y hashcat',
-                shell=True,
+        try:
+            check = subprocess.run(
+                ['/usr/bin/dpkg', '-l', 'hashcat'],
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                text=True
             )
-            if install.returncode == 0:
-                logging.info('[RulesDic] hashcat installed successfully')
+            check_output = check.stdout.strip()
+            if 'hashcat' in check_output:
+                logging.info('[RulesDic] Found hashcat')
                 self.running = True
             else:
-                logging.error(f'[RulesDic] Failed to install hashcat: {install.stderr.decode("utf-8").strip()}')
-		
+                logging.warning('[RulesDic] hashcat is not installed or there was an error!')
+                logging.info('[RulesDic] Attempting to install hashcat...')
+                install = subprocess.run(
+                    ['apt', 'update'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                if install.returncode != 0:
+                    logging.error(f'[RulesDic] Failed to update package list: {install.stderr.strip()}')
+                    return
+            
+                install = subprocess.run(
+                    ['apt', 'install', '-y', 'hashcat'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                if install.returncode == 0:
+                    logging.info('[RulesDic] hashcat installed successfully')
+                    self.running = True
+                else:
+                    logging.error(f'[RulesDic] Failed to install hashcat: {install.stderr.strip()}')
+        except Exception as e:
+            logging.error(f'[RulesDic] Exception occurred: {str(e)}')
+	    
     def on_config_changed(self, config):
         self.options['handshakes'] = config['bettercap']['handshakes']
 
