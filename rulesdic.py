@@ -6,7 +6,7 @@ import pathlib
 from itertools import product
 from datetime import datetime
 from string import punctuation
-from flask import Flask, render_template_string
+from flask import render_template_string
 
 import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
