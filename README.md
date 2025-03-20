@@ -3,8 +3,7 @@ Plugins for pwnagotchi to run hashcat on wordlist based on the ESSID. The main g
 For educational purpose only, run it on your OWN WIFI. 
 
 # Install
-Plugin will attempt to install Hashcat and hcxtpools but it's better to install beforehand:
-- apt-get install hashcat hcxtools
+- apt-get install hashcat hcxtools (will download if missing but not recommended)
 - copy rulesdic.py into your custom plugin directory
 - Cracked handshakes stored in handshake folder as [essid].pcap.cracked
 
