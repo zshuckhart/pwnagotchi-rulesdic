@@ -43,6 +43,7 @@ class RulesDic(plugins.Plugin):
         self.counter = 0
         self.crack_attempts = 0  # Add a counter for crack attempts
         logging.info("Initialization complete")
+        logging.info(f"Options set: {self.options}")
 
     def _load_status_file(self):
         status_file_path = os.path.join(self.options['handshake_path'], '.rulesdic')
@@ -56,7 +57,7 @@ class RulesDic(plugins.Plugin):
 
     def _initialize_options(self):
         logging.info("Initializing options")
-        return {
+        options = {
             'exclude': [],
             'tmp_folder': '/tmp',
             'max_essid_len': 12,
@@ -64,6 +65,8 @@ class RulesDic(plugins.Plugin):
             'handshake_path': '/home/pi/handshakes/',
             'process_existing': False  # Add option to define if existing handshakes should be processed
         }
+        logging.info(f"Options initialized: {options}")
+        return options
 
     def _initialize_years(self):
         logging.info("Initializing years range for wordlist generation")
@@ -123,6 +126,7 @@ class RulesDic(plugins.Plugin):
             self.options['handshake_path'] = config['handshake_path']
         if 'process_existing' in config:
             self.options['process_existing'] = config['process_existing']
+        logging.info(f"Options updated: {self.options}")
 
     def on_handshake(self, agent, filename, access_point, client_station):
         if not self.running:
@@ -365,5 +369,4 @@ class RulesDic(plugins.Plugin):
             
             processed_handshakes += 1
             display.set('status', f'Processed {processed_handshakes}/{total_handshakes} handshakes')
-
         display.set('status', 'Finished processing existing handshakes')
