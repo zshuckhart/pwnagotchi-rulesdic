@@ -105,6 +105,10 @@ class RulesDic(plugins.Plugin):
             logging.info(f'[RulesDic] {filename} already processed')
             return
 
+        # Ensure 'exclude' key exists
+        if 'exclude' not in self.options:
+            self.options['exclude'] = []
+
         if filename in excluded or any(re.match(pattern, essid) for pattern in self.options['exclude']):
             excluded.append(filename)
             self.report.update(data={'reported': reported, 'excluded': excluded})
