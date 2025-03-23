@@ -177,20 +177,20 @@ class RulesDic(plugins.Plugin):
         except Exception as e:
             logging.error(f"[RulesDic] error while updating progress status: {e}")
             logging.debug(e, exc_info=True)
-    
+            
     def check_handshake(self, filename):
         # Execute hashcat to check if the handshake is crackable
         hashcat_command = f'nice hashcat -m 22000 {filename} --show'
         hashcat_execution = subprocess.run(
             hashcat_command, shell=True, stdout=subprocess.PIPE)
-        result = hashcat_execution.stdout.decode('utf-8').strip()
-        
+        result = hashcat_execution.stdout.decode('utf-8', errors='replace').strip()
+    
         # Parse the hashcat result to check if any password was found
         if result:
             return crackable_handshake_re.search(result)
         else:
             return None
-        
+            
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionary(filename, essid)
         command = f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'
