@@ -112,7 +112,7 @@ class RulesDic(plugins.Plugin):
             logging.error(f'[RulesDic] Exception occurred: {str(e)}')
 
         # Process existing handshakes if the option is enabled
-        if self.running and self.options['process_existing']:
+        if self.running and self.options.get('process_existing', False):
             self.process_existing_handshakes()
 
     def on_config_changed(self, config):
