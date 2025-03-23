@@ -12,124 +12,11 @@ import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
 
-# HTML template for rendering the passwords list
-TEMPLATE = """
-{% extends "base.html" %}
-{% set active_page = "passwordsList" %}
+# Load the HTML template from the file
+TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'rulesdic.html')
+with open(TEMPLATE_PATH, 'r') as file:
+    TEMPLATE = file.read()
 
-{% block title %}
-    {{ title }}
-{% endblock %}
-
-{% block meta %}
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, user-scalable=0" />
-{% endblock %}
-
-{% block styles %}
-    {{ super() }}
-    <style>
-        #searchText {
-            width: 100%;
-        }
-        table {
-            table-layout: auto;
-            width: 100%;
-            border: 1px solid;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 15px;
-            text-align: left;
-            border: 1px solid;
-        }
-        @media screen and (max-width: 700px) {
-            table, tr, td {
-                padding: 0;
-                border: 1px solid;
-            }
-            table {
-                border: none;
-            }
-            tr:first-child, thead, th {
-                display: none;
-                border: none;
-            }
-            tr {
-                float: left;
-                width: 100%;
-                margin-bottom: 2em;
-            }
-            td {
-                float: left;
-                width: 100%;
-                padding: 1em;
-            }
-            td::before {
-                content: attr(data-label);
-                word-wrap: break-word;
-                color: white;
-                border-right: 2px solid;
-                width: 20%;
-                float: left;
-                padding: 1em;
-                font-weight: bold;
-                margin: -1em 1em -1em -1em;
-            }
-        }
-    </style>
-{% endblock %}
-
-{% block script %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var searchInput = document.getElementById('searchText');
-            searchInput.onkeyup = function() {
-                var filter = searchInput.value.toUpperCase();
-                var table = document.getElementById('tableOptions');
-                if (table) {
-                    var tr = table.getElementsByTagName('tr');
-                    for (var i = 0; i < tr.length; i++) {
-                        var td = tr[i].getElementsByTagName('td')[0];
-                        if (td) {
-                            var txtValue = td.textContent || td.innerText;
-                            tr[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? '' : 'none';
-                        }
-                    }
-                }
-            }
-        });
-    </script>
-{% endblock %}
-
-{% block content %}
-    <input type="text" id="searchText" placeholder="Search for ..." title="Type in a filter">
-    <div id="progressStatus" style="display: none;">
-        <p id="progressMessage">Cracking in progress...</p>
-    </div>
-    <p id="crackAttempts">Handshakes Cracks Attempted: {{ crack_attempts }}</p>
-    <table id="tableOptions">
-        <thead>
-            <tr>
-                <th>SSID</th>
-                <th>BSSID</th>
-                <th>Password</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in passwords %}
-                <tr>
-                    <td data-label="SSID">{{ p["ssid"] }}</td>
-                    <td data-label="BSSID">{{ p["bssid"] }}</td>
-                    <td data-label="Password">{{ p["password"] }}</td>
-                    <td data-label="Status">{{ p["status"] }}</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% endblock %}
-"""
 class RulesDic(plugins.Plugin):
     __authors__ = 'fmatray, awwshucks'
     __version__ = '1.0.2'
@@ -377,8 +264,9 @@ class RulesDic(plugins.Plugin):
         }
         transformations = [leet_dict.get(c, c) for c in essid.lower()]
         return [''.join(p) for p in product(*transformations)]
-	    
-    def on_webhook(self, path, request): # Handle webhooks for the plugin
+    
+    # Handle webhooks for the plugin
+    def on_webhook(self, path, request): 
         if not self.running:
             return
         if path == "/" or not path:
