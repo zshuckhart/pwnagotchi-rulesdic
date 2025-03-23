@@ -12,6 +12,11 @@ import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
 
+# Define the regular expression pattern for crackable handshake
+crackable_handshake_re = re.compile(
+    r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+((\([1-9][0-9]* handshake(, with PMKID)?\))|(\(\d+ handshake, with PMKID\)))'
+)
+
 # Load the HTML template from the file
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'rulesdic.html')
 with open(TEMPLATE_PATH, 'r') as file:
@@ -121,7 +126,7 @@ class RulesDic(plugins.Plugin):
         logging.info(f'[RulesDic] New handshake {filename}')
         current_time = datetime.now()
 
-        result = self.check_handcheck(filename)
+        result = self.check_handshake(filename)
         if not result:
             logging.info('[RulesDic] No handshake')
             display.set('face', self.options['face'])
@@ -180,14 +185,14 @@ class RulesDic(plugins.Plugin):
             hashcat_command, shell=True, stdout=subprocess.PIPE)
         result = hashcat_execution.stdout.decode('utf-8').strip()
         
-    # Parse the hashcat result to check if any password was found
-    if result:
-        return crackable_handshake_re.search(result)
-    else:
-        return None
+        # Parse the hashcat result to check if any password was found
+        if result:
+            return crackable_handshake_re.search(result)
+        else:
+            return None
         
     def try_to_crack(self, filename, essid, bssid):
-        wordlist_filename = self._generate_dictionnary(filename, essid)
+        wordlist_filename = self._generate_dictionary(filename, essid)
         command = f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'
         logging.info(f'[RulesDic] Running hashcat with command: {command}')  # Log hashcat command
         subprocess.run(command, shell=True, stdout=subprocess.PIPE)
@@ -197,7 +202,7 @@ class RulesDic(plugins.Plugin):
             return result.split(':')[1]
         return None
 
-    def _generate_dictionnary(self, filename, essid):
+    def _generate_dictionary(self, filename, essid):
         wordlist_filename = os.path.join(self.options['tmp_folder'], f"{os.path.splitext(os.path.basename(filename))[0]}.txt")
         logging.info(f'[RulesDic] Generating {wordlist_filename}')
         essid_bases = self._essid_base(essid)
