@@ -32,22 +32,23 @@ class RulesDic(plugins.Plugin):
     }
 
     def __init__(self):
-        self.report = self._load_status_file()
         self.options = self._initialize_options()
+        self.report = self._load_status_file()
         self.years = self._initialize_years()
         self.running = False
         self.counter = 0
         self.crack_attempts = 0  # Add a counter for crack attempts
 
     def _load_status_file(self):
+        status_file_path = os.path.join(self.options['handshake_path'], '.rulesdic')
         try:
-            return StatusFile('/root/handshakes/.rulesdic', data_format='json')
+            return StatusFile(status_file_path, data_format='json')
         except JSONDecodeError:
-            os.remove('/root/handshakes/.rulesdic')
-            return StatusFile('/root/handshakes/.rulesdic', data_format='json')
+            os.remove(status_file_path)
+            return StatusFile(status_file_path, data_format='json')
 
     def _initialize_options(self):
-        return {'exclude': [], 'tmp_folder': '/tmp', 'max_essid_len': 12, 'face': '(≡·≡)'}
+        return {'exclude': [], 'tmp_folder': '/tmp', 'max_essid_len': 12, 'face': '(≡·≡)', 'handshake_path': '/home/pi/handshakes/'}
 
     def _initialize_years(self):
         years = list(map(str, range(1900, datetime.now().year + 1)))
@@ -96,6 +97,8 @@ class RulesDic(plugins.Plugin):
     
     def on_config_changed(self, config):
         self.options['handshakes'] = config['bettercap']['handshakes']
+        if 'handshake_path' in config:
+            self.options['handshake_path'] = config['handshake_path']
 
     def on_handshake(self, agent, filename, access_point, client_station):
         if not self.running:
@@ -167,7 +170,8 @@ class RulesDic(plugins.Plugin):
     def update_progress_status(self, filename, status):
         try:
             passwords = []
-            cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
+            handshake_path = pathlib.Path(self.options['handshake_path'])
+            cracked_files = handshake_path.glob('*.cracked')
             for cracked_file in cracked_files:
                 ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
                 with open(cracked_file, 'r') as f:
@@ -227,7 +231,7 @@ class RulesDic(plugins.Plugin):
     def _punctuation_rule(self, base_essids):
         wd = ["".join(p) for p in product(base_essids, punctuation)]
         wd += ["".join(p) for p in product(base_essids, punctuation, punctuation)]
-        wd += ["".join(p) for p in product(punctuation, base_essids)]
+        wd += ["".join(p) for p in product(base_essids, punctuation)]
         wd += ["".join(p) for p in product(punctuation, base_essids, punctuation)]
         return wd
 
@@ -257,7 +261,8 @@ class RulesDic(plugins.Plugin):
         if path == "/" or not path:
             try:
                 passwords = []
-                cracked_files = pathlib.Path('/home/pi/handshakes/').glob('*.cracked')
+                handshake_path = pathlib.Path(self.options['handshake_path'])
+                cracked_files = handshake_path.glob('*.cracked')
                 for cracked_file in cracked_files:
                     ssid, bssid = re.findall(r"(.*)_([0-9a-f]{12})\.", cracked_file.name)[0]
                     with open(cracked_file, 'r') as f:
