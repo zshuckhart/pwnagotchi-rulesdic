@@ -74,7 +74,7 @@ class RulesDic(plugins.Plugin):
                 if install.returncode != 0:
                     logging.error(f'[RulesDic] Failed to update package list: {install.stderr.strip()}')
                     return
-            
+                
                 install = subprocess.run(
                     ['apt', 'install', '-y', 'hashcat'],
                     stdout=subprocess.PIPE,
@@ -88,7 +88,7 @@ class RulesDic(plugins.Plugin):
                     logging.error(f'[RulesDic] Failed to install hashcat: {install.stderr.strip()}')
         except Exception as e:
             logging.error(f'[RulesDic] Exception occurred: {str(e)}')
-	    
+    
     def on_config_changed(self, config):
         self.options['handshakes'] = config['bettercap']['handshakes']
 
@@ -168,37 +168,37 @@ class RulesDic(plugins.Plugin):
         except Exception as e:
             logging.error(f"[RulesDic] error while updating progress status: {e}")
             logging.debug(e, exc_info=True)
-		
+    
     def check_handcheck(self, filename, interface='wlan0mon'):
-	logging.info('[RulesDic] Checking handshake for filename: %s on interface: %s', filename, interface)
-	    
-	# Ensure the interface is in monitor mode
-	if not self._is_monitor_mode(interface):
-	    self._start_monitor_mode(interface)
-		
-	command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
-	logging.info(f'[RulesDic] Running hcxdumptool with command: {command}')
+        logging.info('[RulesDic] Checking handshake for filename: %s on interface: %s', filename, interface)
+        
+        # Ensure the interface is in monitor mode
+        if not self._is_monitor_mode(interface):
+            self._start_monitor_mode(interface)
+        
+        command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
+        logging.info(f'[RulesDic] Running hcxdumptool with command: {command}')
 
-	for attempt in range(3):
-        result, error = self._run_subprocess(command)
-        if result:
-            break
-        logging.info(f'[RulesDic] Retry capturing handshake... Attempt {attempt + 1}')
+        for attempt in range(3):
+            result, error = self._run_subprocess(command)
+            if result:
+                break
+            logging.info(f'[RulesDic] Retry capturing handshake... Attempt {attempt + 1}')
 
-	if error:
-        logging.warning(f'[RulesDic] hcxdumptool stderr: {error}')
-	    
-	handshake_match = self._parse_handshake(result)
-	if not handshake_match:
-	    logging.warning('[RulesDic] No handshake found with initial pattern')
-	return handshake_match
-	    
+        if error:
+            logging.warning(f'[RulesDic] hcxdumptool stderr: {error}')
+        
+        handshake_match = self._parse_handshake(result)
+        if not handshake_match:
+            logging.warning('[RulesDic] No handshake found with initial pattern')
+        return handshake_match
+    
     def _is_monitor_mode(self, interface):
-	check_mode_command = f'iwconfig {interface}'
+        check_mode_command = f'iwconfig {interface}'
         result, _ = self._run_subprocess(check_mode_command)
         logging.info(f'[RulesDic] iwconfig output: {result}')
         return b'Monitor' in result
-	    
+    
     def _start_monitor_mode(self, interface):
         start_monitor_mode_command = f'sudo airmon-ng start {interface[:-3]}'
         logging.info(f'[RulesDic] Starting monitor mode with command: {start_monitor_mode_command}')
