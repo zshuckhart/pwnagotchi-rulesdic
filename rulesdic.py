@@ -12,6 +12,9 @@ import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
 
+# Set up basic logging configuration
+logging.basicConfig(level=logging.INFO)
+
 # Define the regular expression pattern for crackable handshake
 crackable_handshake_re = re.compile(
     r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+((\([1-9][0-9]* handshake(, with PMKID)?\))|(\(\d+ handshake, with PMKID\)))'
@@ -26,31 +29,37 @@ class RulesDic(plugins.Plugin):
     __authors__ = 'fmatray, AWWShuck'
     __version__ = '1.0.2'
     __license__ = 'GPL3'
-    __description__ = 'Tries to crack with hashcat with a generated wordlist base on the wifi name'
+    __description__ = 'Tries to crack with hashcat with a generated wordlist based on the wifi name'
     __dependencies__ = {
         'apt': ['hashcat'],
     }
 
     def __init__(self):
+        logging.info("Initializing RulesDic plugin")
         self.options = self._initialize_options()
         self.report = self._load_status_file()
         self.years = self._initialize_years()
         self.running = False
         self.counter = 0
         self.crack_attempts = 0  # Add a counter for crack attempts
+        logging.info("Initialization complete")
 
     def _load_status_file(self):
         status_file_path = os.path.join(self.options['handshake_path'], '.rulesdic')
         try:
+            logging.info(f"Loading status file from {status_file_path}")
             return StatusFile(status_file_path, data_format='json')
         except JSONDecodeError:
+            logging.warning("Status file corrupted, creating a new one")
             os.remove(status_file_path)
             return StatusFile(status_file_path, data_format='json')
 
     def _initialize_options(self):
+        logging.info("Initializing options")
         return {'exclude': [], 'tmp_folder': '/tmp', 'max_essid_len': 12, 'face': '(≡·≡)', 'handshake_path': '/home/pi/handshakes/'}
 
     def _initialize_years(self):
+        logging.info("Initializing years range for wordlist generation")
         years = list(map(str, range(1900, datetime.now().year + 1)))
         years.extend(map(str, range(0, 100)))
         return years
@@ -96,6 +105,7 @@ class RulesDic(plugins.Plugin):
             logging.error(f'[RulesDic] Exception occurred: {str(e)}')
     
     def on_config_changed(self, config):
+        logging.info("Configuration changed")
         self.options['handshakes'] = config['bettercap']['handshakes']
         if 'handshake_path' in config:
             self.options['handshake_path'] = config['handshake_path']
@@ -169,6 +179,7 @@ class RulesDic(plugins.Plugin):
 
     def update_progress_status(self, filename, status):
         try:
+            logging.info(f"Updating progress status for {filename}")
             passwords = []
             handshake_path = pathlib.Path(self.options['handshake_path'])
             cracked_files = handshake_path.glob('*.cracked')
@@ -184,6 +195,7 @@ class RulesDic(plugins.Plugin):
             
     def check_handshake(self, filename):
         # Execute hashcat to check if the handshake is crackable
+        logging.info(f"Running hashcat to check handshake for {filename}")
         hashcat_command = f'nice hashcat -m 22000 {filename} --show'
         hashcat_execution = subprocess.run(
             hashcat_command, shell=True, stdout=subprocess.PIPE)
@@ -223,12 +235,15 @@ class RulesDic(plugins.Plugin):
         return wordlist_filename
 
     def _essid_base(self, essid):
+        logging.info(f"Generating base wordlist for ESSID {essid}")
         return [essid, essid.upper(), essid.lower(), essid.capitalize(), re.sub('[0-9]*$', "", essid)]
 
     def _reverse_rule(self, base_essids):
+        logging.info("Applying reverse rule")
         return [essid[::-1] for essid in base_essids]
 
     def _punctuation_rule(self, base_essids):
+        logging.info("Applying punctuation rule")
         wd = ["".join(p) for p in product(base_essids, punctuation)]
         wd += ["".join(p) for p in product(base_essids, punctuation, punctuation)]
         wd += ["".join(p) for p in product(base_essids, punctuation)]
@@ -236,12 +251,14 @@ class RulesDic(plugins.Plugin):
         return wd
 
     def _years_rule(self, base_essids):
+        logging.info("Applying years rule")
         wd = ["".join(p) for p in product(base_essids, self.years)]
         wd += ["".join(p) for p in product(base_essids, self.years, punctuation)]
         wd += ["".join(p) for p in product(base_essids, punctuation, self.years)]
         return wd
 
     def _leet_rule(self, essid):
+        logging.info("Applying leet rule")
         leet_dict = {
             'a': ['4', '@', 'a', 'A'], 'b': ['8', '6', 'b', 'B'], 'c': ['(', '<', '{', '[', 'c', 'C'], 'd': ['d', 'D'],
             'e': ['3', 'e', 'E'], 'f': ['f', 'F'], 'g': ['6', '9', 'g', 'G'], 'h': ['#', 'h', 'H'], 'i': ['!', '|', '1', 'i', 'I'],
@@ -260,6 +277,7 @@ class RulesDic(plugins.Plugin):
             return
         if path == "/" or not path:
             try:
+                logging.info("Handling webhook")
                 passwords = []
                 handshake_path = pathlib.Path(self.options['handshake_path'])
                 cracked_files = handshake_path.glob('*.cracked')
