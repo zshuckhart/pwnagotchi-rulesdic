@@ -173,54 +173,19 @@ class RulesDic(plugins.Plugin):
             logging.error(f"[RulesDic] error while updating progress status: {e}")
             logging.debug(e, exc_info=True)
     
-    def check_handcheck(self, filename, interface='wlan0mon'):
-        logging.info('[RulesDic] Checking handshake for filename: %s on interface: %s', filename, interface)
+    def check_handshake(self, filename):
+        # Execute hashcat to check if the handshake is crackable
+        hashcat_command = f'nice hashcat -m 22000 {filename} --show'
+        hashcat_execution = subprocess.run(
+            hashcat_command, shell=True, stdout=subprocess.PIPE)
+        result = hashcat_execution.stdout.decode('utf-8').strip()
         
-        # Ensure the interface is in monitor mode
-        if not self._is_monitor_mode(interface):
-            self._start_monitor_mode(interface)
+    # Parse the hashcat result to check if any password was found
+    if result:
+        return crackable_handshake_re.search(result)
+    else:
+        return None
         
-        command = f'nice /usr/bin/hcxdumptool -i {interface} -o {filename}.pcapng --active_beacon --enable_status=15 --filtermode=2 --disable_deauthentication'
-        logging.info(f'[RulesDic] Running hcxdumptool with command: {command}')
-
-        for attempt in range(3):
-            result, error = self._run_subprocess(command)
-            if result:
-                break
-            logging.info(f'[RulesDic] Retry capturing handshake... Attempt {attempt + 1}')
-
-        if error:
-            logging.warning(f'[RulesDic] hcxdumptool stderr: {error}')
-        
-        handshake_match = self._parse_handshake(result)
-        if not handshake_match:
-            logging.warning('[RulesDic] No handshake found with initial pattern')
-        return handshake_match
-    
-    def _is_monitor_mode(self, interface):
-        check_mode_command = f'iwconfig {interface}'
-        result, _ = self._run_subprocess(check_mode_command)
-        logging.info(f'[RulesDic] iwconfig output: {result}')
-        return 'Monitor' in result
-    
-    def _start_monitor_mode(self, interface):
-        start_monitor_mode_command = f'sudo airmon-ng start {interface[:-3]}'
-        logging.info(f'[RulesDic] Starting monitor mode with command: {start_monitor_mode_command}')
-        self._run_subprocess(start_monitor_mode_command)
-        # Verify monitor mode
-        self._is_monitor_mode(interface)
-
-    def _run_subprocess(self, command):
-        process = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        result = process.stdout.decode('utf-8').strip()
-        error = process.stderr.decode('utf-8').strip()
-        return result, error
-
-    def _parse_handshake(self, result):
-        enhanced_handshake_re = re.compile(
-            r'\s+\d+\s+(?P<bssid>([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2})\s+(?P<ssid>.+?)\s+(?:\([1-9][0-9]* handshake(?:, with PMKID)?\)|\(\d+ handshake(?:, with PMKID)?\)|handshake|PMKID)')
-        return enhanced_handshake_re.search(result)
-    
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionnary(filename, essid)
         command = f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'
