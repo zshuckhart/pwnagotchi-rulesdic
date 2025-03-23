@@ -18,7 +18,7 @@ with open(TEMPLATE_PATH, 'r') as file:
     TEMPLATE = file.read()
 
 class RulesDic(plugins.Plugin):
-    __authors__ = 'fmatray, awwshucks'
+    __authors__ = 'fmatray, AWWShuck'
     __version__ = '1.0.2'
     __license__ = 'GPL3'
     __description__ = 'Tries to crack with hashcat with a generated wordlist base on the wifi name'
