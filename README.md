@@ -19,6 +19,7 @@ main.plugins.rulesdic.exclude = [  #REGEXP to match the WIFI name
 	"^Android",
 	"^[Ii][Pp]hone"
 ]
+main.plugins.rulesdic.process_existing = false # option to define if existing handshakes should be processed
 main.plugins.rulesdic.face = '(≡·≡)'
 ```
 or in new tomlkit format if using
@@ -29,6 +30,7 @@ tmp_folder = '/my/tmp/folder' # optional if not included will default to: /tmp
 handshake_path = 'my/handhake/folder' # optional, default /home/pi/handshakes
 max_essid_len = 12 # optional, if set to -1-> no limit else does not general leet rule if len(essid) > max_essid_len
 exclude = ["^Android", "^[Ii][Pp]hone"] #REGEXP to match the WIFI name
+process_existing = false # option to define if existing handshakes should be processed
 face = '(≡·≡)'
 ```
 
