@@ -113,6 +113,7 @@ class RulesDic(plugins.Plugin):
 
         # Process existing handshakes if the option is enabled
         if self.running and self.options.get('process_existing', False):
+            logging.info('[RulesDic] Processing existing handshakes at startup')
             self.process_existing_handshakes()
 
     def on_config_changed(self, config):
@@ -166,7 +167,7 @@ class RulesDic(plugins.Plugin):
 
         display.set('status', 'Cracking in progress...')
         self.update_progress_status(filename, 'Cracking in progress...')
-        logging.info('[RulesDic] Before incrementing crack attempts')
+        logging.info(f'[RulesDic] Before incrementing crack attempts')
         self.crack_attempts += 1  # Increment crack attempts counter
         logging.info(f'[RulesDic] Crack attempts incremented: {self.crack_attempts}')  # Log crack attempts
 
@@ -205,7 +206,7 @@ class RulesDic(plugins.Plugin):
         except Exception as e:
             logging.error(f"[RulesDic] error while updating progress status: {e}")
             logging.debug(e, exc_info=True)
-            
+
     def check_handshake(self, filename):
         # Execute hashcat to check if the handshake is crackable
         logging.info(f"Running hashcat to check handshake for {filename}")
@@ -213,13 +214,13 @@ class RulesDic(plugins.Plugin):
         hashcat_execution = subprocess.run(
             hashcat_command, shell=True, stdout=subprocess.PIPE)
         result = hashcat_execution.stdout.decode('utf-8', errors='replace').strip()
-    
+
         # Parse the hashcat result to check if any password was found
         if result:
             return crackable_handshake_re.search(result)
         else:
             return None
-            
+
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionary(filename, essid)
         command = f'nice /usr/bin/hashcat -m 22000 {filename}.pcapng -a 0 -w 3 -o {filename}.cracked {wordlist_filename}'
@@ -283,9 +284,9 @@ class RulesDic(plugins.Plugin):
         }
         transformations = [leet_dict.get(c, c) for c in essid.lower()]
         return [''.join(p) for p in product(*transformations)]
-    
+
     # Handle webhooks for the plugin
-    def on_webhook(self, path, request): 
+    def on_webhook(self, path, request):
         if not self.running:
             return
         if path == "/" or not path:
@@ -309,11 +310,13 @@ class RulesDic(plugins.Plugin):
         logging.info('[RulesDic] Processing existing handshakes')
         handshake_path = pathlib.Path(self.options['handshake_path'])
         handshake_files = handshake_path.glob('*.pcapng')
+        
         for handshake_file in handshake_files:
             filename = str(handshake_file)
             essid = os.path.splitext(os.path.basename(filename))[0].split("_")[0]
             reported = self.report.data_field_or('reported', default=[])
             excluded = self.report.data_field_or('excluded', default=[])
+            
             if filename in reported:
                 logging.info(f'[RulesDic] {filename} already processed')
                 continue
@@ -327,6 +330,7 @@ class RulesDic(plugins.Plugin):
             logging.info(f'[RulesDic] Processing existing handshake for {filename}')
             current_time = datetime.now()
             result = self.check_handshake(filename)
+            
             if not result:
                 logging.info('[RulesDic] No handshake')
                 continue
@@ -335,7 +339,10 @@ class RulesDic(plugins.Plugin):
             logging.info('[RulesDic] Handshake confirmed')
 
             self.update_progress_status(filename, 'Cracking in progress...')
+            logging.info(f'[RulesDic] Crack attempts before incrementing: {self.crack_attempts}')
             self.crack_attempts += 1
+            logging.info(f'[RulesDic] Crack attempts after incrementing: {self.crack_attempts}')
+            
             pwd = self.try_to_crack(filename, essid, bssid)
             duration = (datetime.now() - current_time).total_seconds()
 
