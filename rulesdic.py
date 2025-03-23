@@ -311,6 +311,10 @@ class RulesDic(plugins.Plugin):
         handshake_path = pathlib.Path(self.options['handshake_path'])
         handshake_files = handshake_path.glob('*.pcapng')
         
+        display = agent.view()
+        total_handshakes = len(list(handshake_path.glob('*.pcapng')))
+        processed_handshakes = 0
+
         for handshake_file in handshake_files:
             filename = str(handshake_file)
             essid = os.path.splitext(os.path.basename(filename))[0].split("_")[0]
@@ -358,3 +362,8 @@ class RulesDic(plugins.Plugin):
             reported.append(filename)
             self.report.update(data={'reported': reported, 'excluded': excluded})
             self.update_progress_status(filename, 'Handshake cracks attempted: {}'.format(self.crack_attempts))
+            
+            processed_handshakes += 1
+            display.set('status', f'Processed {processed_handshakes}/{total_handshakes} handshakes')
+
+        display.set('status', 'Finished processing existing handshakes')
