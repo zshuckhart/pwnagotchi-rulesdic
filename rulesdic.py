@@ -63,8 +63,7 @@ class RulesDic(plugins.Plugin):
             'max_essid_len': 12,
             'face': '(≡·≡)',
             'handshake_path': '/home/pi/handshakes/',
-            'process_existing': False  # Add option to define if existing handshakes should be processed
-        }
+           }
         logging.info(f"Options initialized: {options}")
         return options
 
@@ -113,11 +112,6 @@ class RulesDic(plugins.Plugin):
                     logging.error(f'[RulesDic] Failed to install hashcat: {install.stderr.strip()}')
         except Exception as e:
             logging.error(f'[RulesDic] Exception occurred: {str(e)}')
-
-        # Process existing handshakes if the option is enabled
-        if self.running and self.options.get('process_existing', False):
-            logging.info('[RulesDic] Processing existing handshakes at startup')
-            self.process_existing_handshakes()
 
     def on_config_changed(self, config):
         logging.info("Configuration changed")
@@ -308,65 +302,3 @@ class RulesDic(plugins.Plugin):
             except Exception as e:
                 logging.error(f"[RulesDic] error while updating progress status: {e}")
                 logging.debug(e, exc_info=True)
-
-    # Add the following method to handle existing handshakes
-    def process_existing_handshakes(self):
-        logging.info('[RulesDic] Processing existing handshakes')
-        handshake_path = pathlib.Path(self.options['handshake_path'])
-        handshake_files = handshake_path.glob('*.pcapng')
-        
-        display = agent.view()
-        total_handshakes = len(list(handshake_path.glob('*.pcapng')))
-        processed_handshakes = 0
-
-        for handshake_file in handshake_files:
-            filename = str(handshake_file)
-            essid = os.path.splitext(os.path.basename(filename))[0].split("_")[0]
-            reported = self.report.data_field_or('reported', default=[])
-            excluded = self.report.data_field_or('excluded', default=[])
-            
-            if filename in reported:
-                logging.info(f'[RulesDic] {filename} already processed')
-                continue
-
-            if filename in excluded or any(re.match(pattern, essid) for pattern in self.options['exclude']):
-                excluded.append(filename)
-                self.report.update(data={'reported': reported, 'excluded': excluded})
-                logging.info(f'[RulesDic] {filename} excluded')
-                continue
-
-            logging.info(f'[RulesDic] Processing existing handshake for {filename}')
-            current_time = datetime.now()
-            result = self.check_handshake(filename)
-            
-            if not result:
-                logging.info('[RulesDic] No handshake')
-                continue
-
-            bssid = result.group('bssid')
-            logging.info('[RulesDic] Handshake confirmed')
-
-            self.update_progress_status(filename, 'Cracking in progress...')
-            logging.info(f'[RulesDic] Crack attempts before incrementing: {self.crack_attempts}')
-            self.crack_attempts += 1
-            logging.info(f'[RulesDic] Crack attempts after incrementing: {self.crack_attempts}')
-            
-            pwd = self.try_to_crack(filename, essid, bssid)
-            duration = (datetime.now() - current_time).total_seconds()
-
-            if not pwd:
-                self.update_progress_status(filename, 'Password not found')
-                logging.warning(
-                    f'!!! [RulesDic] !!! Key not found for {essid} in {duration // 60:.0f}min and {duration % 60:.0f}s')
-            else:
-                self.update_progress_status(filename, 'Password cracked')
-                logging.warning(
-                    f'!!! [RulesDic] !!! Cracked password for {essid}: {pwd}. Found in {duration // 60:.0f}min and {duration % 60:.0f}s')
-
-            reported.append(filename)
-            self.report.update(data={'reported': reported, 'excluded': excluded})
-            self.update_progress_status(filename, 'Handshake cracks attempted: {}'.format(self.crack_attempts))
-            
-            processed_handshakes += 1
-            display.set('status', f'Processed {processed_handshakes}/{total_handshakes} handshakes')
-        display.set('status', 'Finished processing existing handshakes')
