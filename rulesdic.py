@@ -202,13 +202,20 @@ class RulesDic(plugins.Plugin):
                     pwd = f.read()
                 passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": status})
 
+            # Ensure the JSON log files exist
+            log_files = ['checked_wifis.json', 'crack_attempts.json', 'successful_cracks.json']
+            for log_file in log_files:
+                if not os.path.exists(log_file):
+                    with open(log_file, 'w') as f:
+                        f.write('[]')
+
             # Load logs for checked Wi-Fi networks and crack attempts
             with open('checked_wifis.json', 'r') as log_file:
-                checked_wifis = [json.loads(line) for line in log_file]
+                checked_wifis = json.load(log_file)
             with open('crack_attempts.json', 'r') as log_file:
-                crack_attempts = [json.loads(line) for line in log_file]
+                crack_attempts = json.load(log_file)
             with open('successful_cracks.json', 'r') as log_file:
-                successful_cracks = [json.loads(line) for line in log_file]
+                successful_cracks = json.load(log_file)
 
             return render_template_string(
                 TEMPLATE,
@@ -231,6 +238,11 @@ class RulesDic(plugins.Plugin):
             hashcat_command, shell=True, stdout=subprocess.PIPE)
         result = hashcat_execution.stdout.decode('utf-8', errors='replace').strip()
 
+        # Ensure the checked_wifis.json file exists
+        if not os.path.exists('checked_wifis.json'):
+            with open('checked_wifis.json', 'w') as f:
+                f.write('[]')
+
         # Log the checked Wi-Fi network
         with open('checked_wifis.json', 'a') as log_file:
             log_entry = {"filename": filename, "result": result}
@@ -248,12 +260,22 @@ class RulesDic(plugins.Plugin):
         subprocess.run(command, shell=True, stdout=subprocess.PIPE)
         result = pathlib.Path(f"{filename}.cracked").read_text().strip()
 
+        # Ensure the crack_attempts.json file exists
+        if not os.path.exists('crack_attempts.json'):
+            with open('crack_attempts.json', 'w') as f:
+                f.write('[]')
+
         # Log the crack attempt
         with open('crack_attempts.json', 'a') as log_file:
             log_entry = {"filename": filename, "essid": essid, "bssid": bssid, "status": "attempted"}
             log_file.write(json.dumps(log_entry) + '\n')
 
         if result:
+            # Ensure the successful_cracks.json file exists
+            if not os.path.exists('successful_cracks.json'):
+                with open('successful_cracks.json', 'w') as f:
+                    f.write('[]')
+
             # Log the successful crack
             with open('successful_cracks.json', 'a') as log_file:
                 log_entry = {"filename": filename, "essid": essid, "bssid": bssid, "password": result.split(':')[1]}
@@ -330,13 +352,20 @@ class RulesDic(plugins.Plugin):
                         pwd = f.read()
                     passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": "Cracked"})
 
+                # Ensure the JSON log files exist
+                log_files = ['checked_wifis.json', 'crack_attempts.json', 'successful_cracks.json']
+                for log_file in log_files:
+                    if not os.path.exists(log_file):
+                        with open(log_file, 'w') as f:
+                            f.write('[]')
+
                 # Load logs for checked Wi-Fi networks and crack attempts
                 with open('checked_wifis.json', 'r') as log_file:
-                    checked_wifis = [json.loads(line) for line in log_file]
+                    checked_wifis = json.load(log_file)
                 with open('crack_attempts.json', 'r') as log_file:
-                    crack_attempts = [json.loads(line) for line in log_file]
+                    crack_attempts = json.load(log_file)
                 with open('successful_cracks.json', 'r') as log_file:
-                    successful_cracks = [json.loads(line) for line in log_file]
+                    successful_cracks = json.load(log_file)
 
                 return render_template_string(
                     TEMPLATE,
