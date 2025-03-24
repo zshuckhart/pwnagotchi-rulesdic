@@ -364,9 +364,9 @@ class RulesDic(plugins.Plugin):
                     checked_wifis = json.load(log_file)
                 with open('crack_attempts.json', 'r') as log_file:
                     crack_attempts = json.load(log_file)
-                with open('successful_cracks.json', 'r') as log_file:
-                    successful_cracks = json.load(log_file)
-
+                with open('successful_cracks.json', 'r') as log file:
+                     successful_cracks = json.load(log_file)
+                     
                 return render_template_string(
                     TEMPLATE,
                     title="Passwords list",
