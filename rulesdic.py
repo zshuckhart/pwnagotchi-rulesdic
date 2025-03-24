@@ -201,7 +201,24 @@ class RulesDic(plugins.Plugin):
                 with open(cracked_file, 'r') as f:
                     pwd = f.read()
                 passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": status})
-            return render_template_string(TEMPLATE, title="Passwords list", passwords=passwords, crack_attempts=self.crack_attempts)
+
+            # Load logs for checked Wi-Fi networks and crack attempts
+            with open('checked_wifis.json', 'r') as log_file:
+                checked_wifis = [json.loads(line) for line in log_file]
+            with open('crack_attempts.json', 'r') as log_file:
+                crack_attempts = [json.loads(line) for line in log_file]
+            with open('successful_cracks.json', 'r') as log_file:
+                successful_cracks = [json.loads(line) for line in log_file]
+
+            return render_template_string(
+                TEMPLATE,
+                title="Passwords list",
+                passwords=passwords,
+                crack_attempts=self.crack_attempts,
+                checked_wifis=checked_wifis,
+                crack_attempts_log=crack_attempts,
+                successful_cracks=successful_cracks
+            )
         except Exception as e:
             logging.error(f"[RulesDic] error while updating progress status: {e}")
             logging.debug(e, exc_info=True)
@@ -312,7 +329,24 @@ class RulesDic(plugins.Plugin):
                     with open(cracked_file, 'r') as f:
                         pwd = f.read()
                     passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": "Cracked"})
-                return render_template_string(TEMPLATE, title="Passwords list", passwords=passwords, crack_attempts=self.crack_attempts)
+
+                # Load logs for checked Wi-Fi networks and crack attempts
+                with open('checked_wifis.json', 'r') as log_file:
+                    checked_wifis = [json.loads(line) for line in log_file]
+                with open('crack_attempts.json', 'r') as log_file:
+                    crack_attempts = [json.loads(line) for line in log_file]
+                with open('successful_cracks.json', 'r') as log_file:
+                    successful_cracks = [json.loads(line) for line in log_file]
+
+                return render_template_string(
+                    TEMPLATE,
+                    title="Passwords list",
+                    passwords=passwords,
+                    crack_attempts=self.crack_attempts,
+                    checked_wifis=checked_wifis,
+                    crack_attempts_log=crack_attempts,
+                    successful_cracks=successful_cracks
+                )
             except Exception as e:
                 logging.error(f"[RulesDic] error while updating progress status: {e}")
                 logging.debug(e, exc_info=True)
