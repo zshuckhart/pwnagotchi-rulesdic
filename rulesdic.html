@@ -1,115 +1,75 @@
-{% extends "base.html" %}
-{% set active_page = "passwordsList" %}
-
-{% block title %}
-    {{ title }}
-{% endblock %}
-
-{% block meta %}
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, user-scalable=0" />
-{% endblock %}
-
-{% block styles %}
-    {{ super() }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
     <style>
-        #searchText {
-            width: 100%;
-        }
         table {
-            table-layout: auto;
             width: 100%;
-            border: 1px solid;
             border-collapse: collapse;
         }
-        th, td {
-            padding: 15px;
-            text-align: left;
-            border: 1px solid;
+        table, th, td {
+            border: 1px solid black;
         }
-        @media screen and (max-width: 700px) {
-            table, tr, td {
-                padding: 0;
-                border: 1px solid;
-            }
-            table {
-                border: none;
-            }
-            tr:first-child, thead, th {
-                display: none;
-                border: none;
-            }
-            tr {
-                float: left;
-                width: 100%;
-                margin-bottom: 2em;
-            }
-            td {
-                float: left;
-                width: 100%;
-                padding: 1em;
-            }
-            td::before {
-                content: attr(data-label);
-                word-wrap: break-word;
-                color: white;
-                border-right: 2px solid;
-                width: 20%;
-                float: left;
-                padding: 1em;
-                font-weight: bold;
-                margin: -1em 1em -1em -1em;
-            }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
         }
     </style>
-{% endblock %}
-
-{% block script %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var searchInput = document.getElementById('searchText');
-            searchInput.onkeyup = function() {
-                var filter = searchInput.value.toUpperCase();
-                var table = document.getElementById('tableOptions');
-                if (table) {
-                    var tr = table.getElementsByTagName('tr');
-                    for (var i = 0; i < tr.length; i++) {
-                        var td = tr[i].getElementsByTagName('td')[0];
-                        if (td) {
-                            var txtValue = td.textContent || td.innerText;
-                            tr[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? '' : 'none';
-                        }
-                    }
-                }
-            }
-        });
-    </script>
-{% endblock %}
-
-{% block content %}
-    <input type="text" id="searchText" placeholder="Search for ..." title="Type in a filter">
-    <div id="progressStatus" style="display: none;">
-        <p id="progressMessage">Cracking in progress...</p>
-    </div>
-    <p id="crackAttempts">Handshakes Cracks Attempted: {{ crack_attempts }}</p>
-    <table id="tableOptions">
-        <thead>
-            <tr>
-                <th>SSID</th>
-                <th>BSSID</th>
-                <th>Password</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in passwords %}
-                <tr>
-                    <td data-label="SSID">{{ p["ssid"] }}</td>
-                    <td data-label="BSSID">{{ p["bssid"] }}</td>
-                    <td data-label="Password">{{ p["password"] }}</td>
-                    <td data-label="Status">{{ p["status"] }}</td>
-                </tr>
-            {% endfor %}
-        </tbody>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    <h2>Checked Wi-Fi Networks</h2>
+    <table>
+        <tr>
+            <th>Filename</th>
+            <th>Result</th>
+        </tr>
+        {% for wifi in checked_wifis %}
+        <tr>
+            <td>{{ wifi.filename }}</td>
+            <td>{{ wifi.result }}</td>
+        </tr>
+        {% endfor %}
     </table>
-{% endblock %}
+
+    <h2>Crack Attempts</h2>
+    <table>
+        <tr>
+            <th>Filename</th>
+            <th>ESSID</th>
+            <th>BSSID</th>
+            <th>Status</th>
+        </tr>
+        {% for attempt in crack_attempts_log %}
+        <tr>
+            <td>{{ attempt.filename }}</td>
+            <td>{{ attempt.essid }}</td>
+            <td>{{ attempt.bssid }}</td>
+            <td>{{ attempt.status }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>Successful Cracks</h2>
+    <table>
+        <tr>
+            <th>Filename</th>
+            <th>ESSID</th>
+            <th>BSSID</th>
+            <th>Password</th>
+        </tr>
+        {% for crack in successful_cracks %}
+        <tr>
+            <td>{{ crack.filename }}</td>
+            <td>{{ crack.essid }}</td>
+            <td>{{ crack.bssid }}</td>
+            <td>{{ crack.password }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
