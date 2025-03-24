@@ -8,7 +8,6 @@ from datetime import datetime
 from string import punctuation
 from flask import render_template_string
 import json
-
 import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
@@ -32,6 +31,12 @@ LOG_DIR = os.path.join(os.path.dirname(__file__), 'rulesdic_logs')
 # Create the directory if it does not exist
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
+
+def ensure_json_file_exists(file_path):
+    if not os.path.exists(file_path):
+        with open(file_path, 'w') as f:
+            f.write('[]')
+        logging.info(f"Created missing JSON file: {file_path}")
 
 class RulesDic(plugins.Plugin):
     __authors__ = 'fmatray, AWWShuck'
@@ -213,9 +218,7 @@ class RulesDic(plugins.Plugin):
             log_files = ['checked_wifis.json', 'crack_attempts.json', 'successful_cracks.json']
             for log_file in log_files:
                 log_file_path = os.path.join(LOG_DIR, log_file)
-                if not os.path.exists(log_file_path):
-                    with open(log_file_path, 'w') as f:
-                        f.write('[]')
+                ensure_json_file_exists(log_file_path)
 
             # Load logs for checked Wi-Fi networks and crack attempts
             with open(os.path.join(LOG_DIR, 'checked_wifis.json'), 'r') as log_file:
@@ -248,9 +251,7 @@ class RulesDic(plugins.Plugin):
 
         # Ensure the checked_wifis.json file exists
         log_file_path = os.path.join(LOG_DIR, 'checked_wifis.json')
-        if not os.path.exists(log_file_path):
-            with open(log_file_path, 'w') as f:
-                f.write('[]')
+        ensure_json_file_exists(log_file_path)
 
         # Log the checked Wi-Fi network
         with open(log_file_path, 'a') as log_file:
@@ -271,9 +272,7 @@ class RulesDic(plugins.Plugin):
 
         # Ensure the crack_attempts.json file exists
         log_file_path = os.path.join(LOG_DIR, 'crack_attempts.json')
-        if not os.path.exists(log_file_path):
-            with open(log_file_path, 'w') as f:
-                f.write('[]')
+        ensure_json_file_exists(log_file_path)
 
         # Log the crack attempt
         with open(log_file_path, 'a') as log_file:
@@ -283,9 +282,7 @@ class RulesDic(plugins.Plugin):
         if result:
             # Ensure the successful_cracks.json file exists
             log_file_path = os.path.join(LOG_DIR, 'successful_cracks.json')
-            if not os.path.exists(log_file_path):
-                with open(log_file_path, 'w') as f:
-                    f.write('[]')
+            ensure_json_file_exists(log_file_path)
 
             # Log the successful crack
             with open(log_file_path, 'a') as log_file:
@@ -362,23 +359,23 @@ class RulesDic(plugins.Plugin):
                     with open(cracked_file, 'r') as f:
                         pwd = f.read()
                     passwords.append({"ssid": ssid, "bssid": bssid, "password": pwd, "status": "Cracked"})
-                    
+
                 # Ensure the JSON log files exist
                 log_files = ['checked_wifis.json', 'crack_attempts.json', 'successful_cracks.json']
                 for log_file in log_files:
                     log_file_path = os.path.join(LOG_DIR, log_file)
-                    if not os.path.exists(log_file_path):
-                        with open(log_file_path, 'w') as f:
-                            f.write('[]')
-                            
+                    ensure_json_file_exists(log_file_path)
+
                 # Load logs for checked Wi-Fi networks and crack attempts
+                with open(os.path.join(LOG_DIR, 'checked_wifis.json'), 'r') as log_file:
+                    checked_wifis = json.load(log_file)
                 with open(os.path.join(LOG_DIR, 'checked_wifis.json'), 'r') as log_file:
                     checked_wifis = json.load(log_file)
                 with open(os.path.join(LOG_DIR, 'crack_attempts.json'), 'r') as log_file:
                     crack_attempts = json.load(log_file)
                 with open(os.path.join(LOG_DIR, 'successful_cracks.json'), 'r') as log_file:
                     successful_cracks = json.load(log_file)
-
+                    
                 return render_template_string(
                     TEMPLATE,
                     title="Passwords list",
@@ -390,4 +387,3 @@ class RulesDic(plugins.Plugin):
                 )
                 except Exception as e:
                     logging.error(f"[RulesDic] error while updating progress status: {e}")
-    
