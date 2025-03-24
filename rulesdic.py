@@ -7,6 +7,7 @@ from itertools import product
 from datetime import datetime
 from string import punctuation
 from flask import render_template_string
+import json
 
 import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
@@ -63,7 +64,7 @@ class RulesDic(plugins.Plugin):
             'max_essid_len': 12,
             'face': '(≡·≡)',
             'handshake_path': '/home/pi/handshakes/',
-           }
+        }
         logging.info(f"Options initialized: {options}")
         return options
 
@@ -213,7 +214,11 @@ class RulesDic(plugins.Plugin):
             hashcat_command, shell=True, stdout=subprocess.PIPE)
         result = hashcat_execution.stdout.decode('utf-8', errors='replace').strip()
 
-        # Parse the hashcat result to check if any password was found
+        # Log the checked Wi-Fi network
+        with open('checked_wifis.json', 'a') as log_file:
+            log_entry = {"filename": filename, "result": result}
+            log_file.write(json.dumps(log_entry) + '\n')
+
         if result:
             return crackable_handshake_re.search(result)
         else:
@@ -226,7 +231,16 @@ class RulesDic(plugins.Plugin):
         subprocess.run(command, shell=True, stdout=subprocess.PIPE)
         result = pathlib.Path(f"{filename}.cracked").read_text().strip()
 
+        # Log the crack attempt
+        with open('crack_attempts.json', 'a') as log_file:
+            log_entry = {"filename": filename, "essid": essid, "bssid": bssid, "status": "attempted"}
+            log_file.write(json.dumps(log_entry) + '\n')
+
         if result:
+            # Log the successful crack
+            with open('successful_cracks.json', 'a') as log_file:
+                log_entry = {"filename": filename, "essid": essid, "bssid": bssid, "password": result.split(':')[1]}
+                log_file.write(json.dumps(log_entry) + '\n')
             return result.split(':')[1]
         return None
 
