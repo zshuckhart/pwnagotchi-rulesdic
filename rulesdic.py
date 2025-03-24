@@ -385,5 +385,5 @@ class RulesDic(plugins.Plugin):
                     crack_attempts_log=crack_attempts,
                     successful_cracks=successful_cracks
                 )
-                except Exception as e:
-                    logging.error(f"[RulesDic] error while updating progress status: {e}")
+            except Exception as e:
+                logging.error(f"[RulesDic] error while updating progress status: {e}")
