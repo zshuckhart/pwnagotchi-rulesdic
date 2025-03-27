@@ -253,6 +253,33 @@ class RulesDic(plugins.Plugin):
         log_file_path = os.path.join(LOG_DIR, 'checked_wifis.json')
         ensure_json_file_exists(log_file_path)
 
+        # Load the existing checked Wi-Fi networks to avoid duplicates
+        with open(log_file_path, 'r') as log_file:
+            checked_wifis = set(json.load(log_file))
+
+        # Log the checked Wi-Fi network only if it hasn't been logged before
+        if filename not in checked_wifis:
+            with open(log_file_path, 'a') as log_file:
+                log_entry = {"filename": filename, "result": result}
+                log_file.write(json.dumps(log_entry) + '\n')
+            checked_wifis.add(filename)
+
+        if result:
+            return crackable_handshake_re.search(result)
+        else:
+            return Nonedef check_handshake(self, filename):
+        
+        # Execute hashcat to check if the handshake is crackable
+        logging.info(f"Running hashcat to check handshake for {filename}")
+        hashcat_command = f'nice hashcat -m 22000 {filename} --show'
+        hashcat_execution = subprocess.run(
+            hashcat_command, shell=True, stdout=subprocess.PIPE)
+        result = hashcat_execution.stdout.decode('utf-8', errors='replace').strip()
+
+        # Ensure the checked_wifis.json file exists
+        log_file_path = os.path.join(LOG_DIR, 'checked_wifis.json')
+        ensure_json_file_exists(log_file_path)
+
         # Log the checked Wi-Fi network
         with open(log_file_path, 'a') as log_file:
             log_entry = {"filename": filename, "result": result}
