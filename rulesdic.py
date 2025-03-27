@@ -240,7 +240,7 @@ class RulesDic(plugins.Plugin):
         except Exception as e:
             logging.error(f"[RulesDic] error while updating progress status: {e}")
             logging.debug(e, exc_info=True)
-
+            
     def check_handshake(self, filename):
         # Execute hashcat to check if the handshake is crackable
         logging.info(f"Running hashcat to check handshake for {filename}")
@@ -301,23 +301,36 @@ class RulesDic(plugins.Plugin):
         log_file_path = os.path.join(LOG_DIR, 'crack_attempts.json')
         ensure_json_file_exists(log_file_path)
 
-        # Log the crack attempt
-        with open(log_file_path, 'a') as log_file:
-            log_entry = {"filename": filename, "essid": essid, "bssid": bssid, "status": "attempted"}
-            log_file.write(json.dumps(log_entry) + '\n')
+        # Load existing crack attempts to avoid duplicates
+        with open(log_file_path, 'r') as log_file:
+            crack_attempts = set(json.load(log_file))
+
+        # Log the crack attempt only if it hasn't been logged before
+        crack_attempt_entry = {"filename": filename, "essid": essid, "bssid": bssid, "status": "attempted"}
+        if crack_attempt_entry not in crack_attempts:
+            with open(log_file_path, 'a') as log_file:
+                log_file.write(json.dumps(crack_attempt_entry) + '\n')
+            crack_attempts.add(crack_attempt_entry)
 
         if result:
             # Ensure the successful_cracks.json file exists
             log_file_path = os.path.join(LOG_DIR, 'successful_cracks.json')
             ensure_json_file_exists(log_file_path)
 
-            # Log the successful crack
-            with open(log_file_path, 'a') as log_file:
-                log_entry = {"filename": filename, "essid": essid, "bssid": bssid, "password": result.split(':')[1]}
-                log_file.write(json.dumps(log_entry) + '\n')
+            # Load existing successful cracks to avoid duplicates
+            with open(log_file_path, 'r') as log_file:
+                successful_cracks = set(json.load(log_file))
+
+            # Log the successful crack only if it hasn't been logged before
+            successful_crack_entry = {"filename": filename, "essid": essid, "bssid": bssid, "password": result.split(':')[1]}
+            if successful_crack_entry not in successful_cracks:
+                with open(log_file_path, 'a') as log_file:
+                    log_file.write(json.dumps(successful_crack_entry) + '\n')
+                successful_cracks.add(successful_crack_entry)
+
             return result.split(':')[1]
         return None
-
+    
     def _generate_dictionary(self, filename, essid):
         wordlist_filename = os.path.join(self.options['tmp_folder'], f"{os.path.splitext(os.path.basename(filename))[0]}.txt")
         logging.info(f'[RulesDic] Generating {wordlist_filename}')
