@@ -11,6 +11,8 @@ import json
 import pwnagotchi.plugins as plugins
 from pwnagotchi.utils import StatusFile
 from json.decoder import JSONDecodeError
+import tempfile
+import fcntl
 
 # Set up basic logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -32,11 +34,37 @@ LOG_DIR = os.path.join(os.path.dirname(__file__), 'rulesdic_logs')
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 
+def atomic_write(file_path, data):
+    temp_file_path = file_path + '.tmp'
+    with open(temp_file_path, 'w') as temp_file:
+        json.dump(data, temp_file)
+    os.replace(temp_file_path, file_path)
+
 def ensure_json_file_exists(file_path):
     if not os.path.exists(file_path):
         with open(file_path, 'w') as f:
             f.write('[]')
         logging.info(f"Created missing JSON file: {file_path}")
+
+def load_json_file(file_path):
+    try:
+        with open(file_path, 'r') as f:
+            fcntl.flock(f, fcntl.LOCK_SH)
+            data = json.load(f)
+            fcntl.flock(f, fcntl.LOCK_UN)
+        return data
+    except JSONDecodeError:
+        logging.error(f"File {file_path} is corrupted. Resetting the file.")
+        atomic_write(file_path, [])
+        return []
+    except Exception as e:
+        logging.error(f"Error loading JSON file {file_path}: {e}")
+        return []
+
+def update_json_file(file_path, new_data):
+    data = load_json_file(file_path)
+    data.append(new_data)
+    atomic_write(file_path, data)
 
 class RulesDic(plugins.Plugin):
     __authors__ = 'fmatray, AWWShuck'
@@ -221,12 +249,9 @@ class RulesDic(plugins.Plugin):
                 ensure_json_file_exists(log_file_path)
 
             # Load logs for checked Wi-Fi networks and crack attempts
-            with open(os.path.join(LOG_DIR, 'checked_wifis.json'), 'r') as log_file:
-                checked_wifis = json.load(log_file)
-            with open(os.path.join(LOG_DIR, 'crack_attempts.json'), 'r') as log_file:
-                crack_attempts = json.load(log_file)
-            with open(os.path.join(LOG_DIR, 'successful_cracks.json'), 'r') as log_file:
-                successful_cracks = json.load(log_file)
+            checked_wifis = load_json_file(os.path.join(LOG_DIR, 'checked_wifis.json'))
+            crack_attempts = load_json_file(os.path.join(LOG_DIR, 'crack_attempts.json'))
+            successful_cracks = load_json_file(os.path.join(LOG_DIR, 'successful_cracks.json'))
 
             return render_template_string(
                 TEMPLATE,
@@ -240,7 +265,7 @@ class RulesDic(plugins.Plugin):
         except Exception as e:
             logging.error(f"[RulesDic] error while updating progress status: {e}")
             logging.debug(e, exc_info=True)
-            
+
     def check_handshake(self, filename):
         # Convert .pcap file to .22000 format
         converted_filename = f"{filename}.22000"
@@ -265,15 +290,12 @@ class RulesDic(plugins.Plugin):
                 checked_wifis = set(json.load(log_file))
         except JSONDecodeError:
             logging.error(f"Checked Wi-Fi log file {log_file_path} is corrupted. Resetting the file.")
-            with open(log_file_path, 'w') as log_file:
-                log_file.write('[]')
+            atomic_write(log_file_path, [])
             checked_wifis = set()
 
         # Log the checked Wi-Fi network only if it hasn't been logged before
         if filename not in checked_wifis:
-            with open(log_file_path, 'a') as log_file:
-                log_entry = {"filename": filename, "result": result}
-                log_file.write(json.dumps(log_entry) + '\n')
+            log_checked_wifi(filename, result)
             checked_wifis.add(filename)
 
         if result:
@@ -293,14 +315,12 @@ class RulesDic(plugins.Plugin):
         ensure_json_file_exists(log_file_path)
 
         # Load existing crack attempts to avoid duplicates
-        with open(log_file_path, 'r') as log_file:
-            crack_attempts = set(json.load(log_file))
+        crack_attempts = load_json_file(log_file_path)
 
         # Log the crack attempt only if it hasn't been logged before
         crack_attempt_entry = {"filename": filename, "essid": essid, "bssid": bssid, "status": "attempted"}
         if crack_attempt_entry not in crack_attempts:
-            with open(log_file_path, 'a') as log_file:
-                log_file.write(json.dumps(crack_attempt_entry) + '\n')
+            update_json_file(log_file_path, crack_attempt_entry)
             crack_attempts.add(crack_attempt_entry)
 
         if result:
@@ -309,19 +329,17 @@ class RulesDic(plugins.Plugin):
             ensure_json_file_exists(log_file_path)
 
             # Load existing successful cracks to avoid duplicates
-            with open(log_file_path, 'r') as log_file:
-                successful_cracks = set(json.load(log_file))
+            successful_cracks = load_json_file(log_file_path)
 
             # Log the successful crack only if it hasn't been logged before
             successful_crack_entry = {"filename": filename, "essid": essid, "bssid": bssid, "password": result.split(':')[1]}
             if successful_crack_entry not in successful_cracks:
-                with open(log_file_path, 'a') as log_file:
-                    log_file.write(json.dumps(successful_crack_entry) + '\n')
+                update_json_file(log_file_path, successful_crack_entry)
                 successful_cracks.add(successful_crack_entry)
 
             return result.split(':')[1]
         return None
-    
+
     def _generate_dictionary(self, filename, essid):
         wordlist_filename = os.path.join(self.options['tmp_folder'], f"{os.path.splitext(os.path.basename(filename))[0]}.txt")
         logging.info(f'[RulesDic] Generating {wordlist_filename}')
@@ -361,7 +379,7 @@ class RulesDic(plugins.Plugin):
         wd += ["".join(p) for p in product(base_essids, punctuation, self.years)]
         return wd
 
-    def _leet_rule(self, essid):
+        def _leet_rule(self, essid):
         logging.info("Applying leet rule")
         leet_dict = {
             'a': ['4', '@', 'a', 'A'], 'b': ['8', '6', 'b', 'B'], 'c': ['(', '<', '{', '[', 'c', 'C'], 'd': ['d', 'D'],
@@ -398,15 +416,10 @@ class RulesDic(plugins.Plugin):
                     ensure_json_file_exists(log_file_path)
 
                 # Load logs for checked Wi-Fi networks and crack attempts
-                with open(os.path.join(LOG_DIR, 'checked_wifis.json'), 'r') as log_file:
-                    checked_wifis = json.load(log_file)
-                with open(os.path.join(LOG_DIR, 'checked_wifis.json'), 'r') as log_file:
-                    checked_wifis = json.load(log_file)
-                with open(os.path.join(LOG_DIR, 'crack_attempts.json'), 'r') as log_file:
-                    crack_attempts = json.load(log_file)
-                with open(os.path.join(LOG_DIR, 'successful_cracks.json'), 'r') as log_file:
-                    successful_cracks = json.load(log_file)
-                    
+                checked_wifis = load_json_file(os.path.join(LOG_DIR, 'checked_wifis.json'))
+                crack_attempts = load_json_file(os.path.join(LOG_DIR, 'crack_attempts.json'))
+                successful_cracks = load_json_file(os.path.join(LOG_DIR, 'successful_cracks.json'))
+
                 return render_template_string(
                     TEMPLATE,
                     title="Passwords list",
@@ -418,3 +431,4 @@ class RulesDic(plugins.Plugin):
                 )
             except Exception as e:
                 logging.error(f"[RulesDic] error while updating progress status: {e}")
+                logging.debug(e, exc_info=True)
