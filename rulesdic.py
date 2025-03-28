@@ -267,7 +267,9 @@ class RulesDic(plugins.Plugin):
         if result:
             return crackable_handshake_re.search(result)
         else:
-            return Nonedef check_handshake(self, filename):
+            return None
+            
+    def check_handshake(self, filename):
         
         # Execute hashcat to check if the handshake is crackable
         logging.info(f"Running hashcat to check handshake for {filename}")
