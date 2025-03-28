@@ -46,6 +46,21 @@ def ensure_json_file_exists(file_path):
             f.write('[]')
         logging.info(f"Created missing JSON file: {file_path}")
 
+def log_checked_wifi(filename, result):
+    log_file_path = os.path.join(LOG_DIR, 'checked_wifis.json')
+    ensure_json_file_exists(log_file_path)
+    
+    # Load the existing checked Wi-Fi networks
+    checked_wifis = load_json_file(log_file_path)
+    
+    # Append the new checked Wi-Fi network
+    checked_wifis.append({"filename": filename, "result": result})
+    
+    # Write the updated list back to the file
+    atomic_write(log_file_path, checked_wifis)
+    
+    logging.info(f"Logged checked Wi-Fi network: {filename}")
+
 def load_json_file(file_path):
     try:
         with open(file_path, 'r') as f:
@@ -379,7 +394,7 @@ class RulesDic(plugins.Plugin):
         wd += ["".join(p) for p in product(base_essids, punctuation, self.years)]
         return wd
 
-        def _leet_rule(self, essid):
+    def _leet_rule(self, essid):
         logging.info("Applying leet rule")
         leet_dict = {
             'a': ['4', '@', 'a', 'A'], 'b': ['8', '6', 'b', 'B'], 'c': ['(', '<', '{', '[', 'c', 'C'], 'd': ['d', 'D'],
