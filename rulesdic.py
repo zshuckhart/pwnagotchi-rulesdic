@@ -260,8 +260,14 @@ class RulesDic(plugins.Plugin):
         ensure_json_file_exists(log_file_path)
 
         # Load the existing checked Wi-Fi networks to avoid duplicates
-        with open(log_file_path, 'r') as log_file:
-            checked_wifis = set(json.load(log_file))
+        try:
+            with open(log_file_path, 'r') as log_file:
+                checked_wifis = set(json.load(log_file))
+        except JSONDecodeError:
+            logging.error(f"Checked Wi-Fi log file {log_file_path} is corrupted. Resetting the file.")
+            with open(log_file_path, 'w') as log_file:
+                log_file.write('[]')
+            checked_wifis = set()
 
         # Log the checked Wi-Fi network only if it hasn't been logged before
         if filename not in checked_wifis:
@@ -273,7 +279,7 @@ class RulesDic(plugins.Plugin):
         if result:
             return crackable_handshake_re.search(result)
         else:
-            return None            
+            return None
 
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionary(filename, essid)
