@@ -242,9 +242,15 @@ class RulesDic(plugins.Plugin):
             logging.debug(e, exc_info=True)
             
     def check_handshake(self, filename):
+        # Convert .pcap file to .22000 format
+        converted_filename = f"{filename}.22000"
+        convert_command = f"hcxpcapngtool -o {converted_filename} {filename}"
+        subprocess.run(convert_command, shell=True, stdout=subprocess.PIPE)
+        logging.info(f"Converted {filename} to {converted_filename}")
+
         # Execute hashcat to check if the handshake is crackable
-        logging.info(f"Running hashcat to check handshake for {filename}")
-        hashcat_command = f'nice hashcat -m 22000 {filename} --show'
+        logging.info(f"Running hashcat to check handshake for {converted_filename}")
+        hashcat_command = f'nice hashcat -m 22000 {converted_filename} --show'
         hashcat_execution = subprocess.run(
             hashcat_command, shell=True, stdout=subprocess.PIPE)
         result = hashcat_execution.stdout.decode('utf-8', errors='replace').strip()
@@ -267,30 +273,7 @@ class RulesDic(plugins.Plugin):
         if result:
             return crackable_handshake_re.search(result)
         else:
-            return None
-            
-    def check_handshake(self, filename):
-        
-        # Execute hashcat to check if the handshake is crackable
-        logging.info(f"Running hashcat to check handshake for {filename}")
-        hashcat_command = f'nice hashcat -m 22000 {filename} --show'
-        hashcat_execution = subprocess.run(
-            hashcat_command, shell=True, stdout=subprocess.PIPE)
-        result = hashcat_execution.stdout.decode('utf-8', errors='replace').strip()
-
-        # Ensure the checked_wifis.json file exists
-        log_file_path = os.path.join(LOG_DIR, 'checked_wifis.json')
-        ensure_json_file_exists(log_file_path)
-
-        # Log the checked Wi-Fi network
-        with open(log_file_path, 'a') as log_file:
-            log_entry = {"filename": filename, "result": result}
-            log_file.write(json.dumps(log_entry) + '\n')
-
-        if result:
-            return crackable_handshake_re.search(result)
-        else:
-            return None
+            return None            
 
     def try_to_crack(self, filename, essid, bssid):
         wordlist_filename = self._generate_dictionary(filename, essid)
